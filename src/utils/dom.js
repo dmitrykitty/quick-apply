@@ -15,7 +15,12 @@
     return text(element.closest('label'));
   }
   function container(element) {
-    return element.closest('[data-automation-id$="-section"], .field, .form-field, .application-question, .input-wrapper, fieldset') || element.parentElement;
+    return element.closest('[data-automation-id="formField"], [data-automation-id="formFieldContainer"], [data-automation-id$="-section"], .field, .form-field, .application-question, .input-wrapper, fieldset') || element.parentElement;
   }
-  root.OpenApplyDom = { visible, text, labelFor, container };
+  function context(element) {
+    const section = element.closest('fieldset, section, [data-automation-id$="Section"], [data-automation-id$="section"]');
+    return text(section?.querySelector('legend, h1, h2, h3, [data-automation-id="sectionTitle"]')) ||
+      section?.getAttribute('data-automation-id') || '';
+  }
+  root.OpenApplyDom = { visible, text, labelFor, container, context };
 })(globalThis);

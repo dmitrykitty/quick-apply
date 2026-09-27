@@ -42,3 +42,18 @@ test('languages round-trip through the editor format and normalized profile', ()
   assert.equal(formatLanguageLines(languages), 'English | Fluent\nPolish | Native\nFrench');
   assert.deepEqual(normalizeProfile({ languages }).languages, languages);
 });
+
+test('migrates legacy education years without dropping them', () => {
+  const profile = normalizeProfile({ education: [{ institution: 'Example', startYear: '2024', endYear: '2028', current: true }] });
+  assert.deepEqual(profile.education[0], {
+    institution: 'Example', degree: '', fieldOfStudy: '', startDate: '2024', endDate: '2028', current: true
+  });
+});
+
+test('imports month-level JobPrefill education dates and preserves saved custom answers', () => {
+  const imported = fromJobPrefill({ personal: {}, workExperience: [], education: [{ startYear: '2024', startMonth: 'September', graduationYear: '2028', graduationMonth: '02' }] });
+  assert.equal(imported.education[0].startDate, '2024-09');
+  assert.equal(imported.education[0].endDate, '2028-02');
+  const customAnswers = [{ question: 'How did you hear about us?', answer: 'Career fair', controlType: 'text', domain: 'jobs.example.test', platform: 'Workday' }];
+  assert.deepEqual(normalizeProfile({ customAnswers }).customAnswers, customAnswers);
+});

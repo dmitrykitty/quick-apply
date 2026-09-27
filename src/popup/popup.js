@@ -1,159 +1,135 @@
 (function () {
   'use strict';
-  const schema = globalThis.OpenApplySchema;
   const storage = globalThis.OpenApplyStorage;
-  const fieldsRoot = document.getElementById('fields');
-  const result = document.getElementById('result');
-  const editor = document.getElementById('editor');
-  const fileInput = document.getElementById('file');
-  const scriptFiles = [
+  const normalize = globalThis.OpenApplyText.normalize;
+  const files = [
     'src/utils/text.js', 'src/utils/dom.js', 'src/utils/events.js',
     'src/content/formScanner.js', 'src/content/fieldMatcher.js', 'src/content/fieldFiller.js',
-    'src/adapters/baseAdapter.js', 'src/adapters/greenhouseAdapter.js',
-    'src/adapters/leverAdapter.js', 'src/adapters/workdayAdapter.js', 'src/content/index.js'
+    'src/adapters/baseAdapter.js', 'src/adapters/greenhouseAdapter.js', 'src/adapters/leverAdapter.js',
+    'src/adapters/workdayHelpers.js', 'src/adapters/workdayAdapter.js', 'src/content/index.js'
   ];
-  const names = {
-    firstName: 'First name', lastName: 'Last name', preferredName: 'Preferred name', email: 'Email', phone: 'Phone',
-    city: 'City', country: 'Country', address: 'Street address', postalCode: 'Postal code',
-    linkedin: 'LinkedIn', github: 'GitHub', portfolio: 'Portfolio',
-    euCitizen: 'EU citizen', authorizedInEU: 'Authorized in EU', requiresVisaEU: 'Requires EU visa',
-    authorizedInUK: 'Authorized in UK', requiresVisaUK: 'Requires UK visa',
-    authorizedInUS: 'Authorized in US', requiresVisaUS: 'Requires US visa', willingToRelocate: 'Willing to relocate',
-    previousEmployee: 'Previously employed here', age18Plus: 'At least 18',
-    sponsorshipRequired: 'Sponsorship required', relocation: 'Open to relocation'
+  const $ = id => document.getElementById(id);
+  const reason = {
+    'already-filled': 'Already filled', 'no-profile-value': 'No saved answer', 'unknown-field': 'Unknown field',
+    'unmatched-option': 'Option not found', 'unsupported-control': 'Unsupported control',
+    'unsupported-workday-control': 'Unsupported Workday control', 'unsupported-format': 'Date format not supported',
+    'unsafe-checkbox': 'Checkbox needs review', 'repeated-field-needs-review': 'Repeated field needs review'
   };
 
-  function show(message, error = false) {
-    result.textContent = message;
-    result.classList.toggle('error', error);
+  function message(text, state = '') { $('message').textContent = text; $('message').className = `message ${state}`; }
+  function status(platform, label, state) {
+    $('platform').textContent = platform;
+    $('siteBadge').textContent = label;
+    $('siteBadge').className = `badge ${state}`;
   }
-  function makeFieldset(title) {
-    const group = document.createElement('fieldset');
-    const legend = document.createElement('legend');
-    legend.textContent = title;
-    group.append(legend);
-    fieldsRoot.append(group);
-    return group;
+  function profileStatus(profile) {
+    const checks = [
+      ['Personal information', !!(profile.personal.firstName && profile.personal.lastName && profile.personal.email)],
+      ['Education', profile.education.some(item => item.institution || item.degree)],
+      ['Experience', profile.experience.some(item => item.company || item.title)],
+      ['Work authorization', Object.values(profile.workAuthorization).some(value => value !== null)],
+      ['Skills & languages', profile.skills.length > 0 || profile.languages.length > 0]
+    ];
+    $('profileStatus').replaceChildren();
+    for (const [label, ready] of checks) {
+      const item = document.createElement('li'); item.textContent = label; item.className = ready ? 'ready' : '';
+      $('profileStatus').append(item);
+    }
   }
-  function addField(group, path, value) {
-    const key = path.split('.').at(-1);
-    const label = document.createElement('label');
-    label.textContent = names[key] || key;
-    let control;
-    if (typeof value === 'boolean' || value === null) {
-      control = document.createElement('select');
-      for (const [text, choice] of [['Unanswered', ''], ['Yes', 'true'], ['No', 'false']]) {
-        const option = document.createElement('option'); option.textContent = text; option.value = choice; control.append(option);
+  function renderResult(summary) {
+    if (!summary || summary.error) return;
+    $('emptyResult').hidden = true;
+    $('resultBody').hidden = false;
+    $('resultPlatform').textContent = summary.platform;
+    $('filledCount').textContent = summary.filled;
+    $('skippedCount').textContent = summary.skipped;
+    $('reviewCount').textContent = summary.review;
+    $('detailGroups').replaceChildren();
+    for (const [category, title] of [['filled', 'Filled'], ['skipped', 'Skipped'], ['review', 'Need review']]) {
+      const items = summary.details.filter(item => item.category === category);
+      if (!items.length) continue;
+      const group = document.createElement('div'); group.className = 'detail-group';
+      const heading = document.createElement('h3'); heading.textContent = title;
+      const list = document.createElement('ul');
+      for (const item of items) {
+        const row = document.createElement('li');
+        const label = document.createElement('span'); label.textContent = item.label; row.append(label);
+        if (item.result !== 'filled') {
+          const note = document.createElement('small'); note.textContent = reason[item.result] || item.result; row.append(note);
+        }
+        if (item.result === 'unknown-field' && item.learnable && summary.domain &&
+            ['text', 'textarea', 'select', 'radio'].includes(item.type)) addRemember(row, item, summary);
+        list.append(row);
       }
-    } else {
-      control = document.createElement('input');
-      control.type = key === 'email' ? 'email' : key === 'phone' ? 'tel' : ['linkedin', 'github', 'portfolio'].includes(key) ? 'url' : 'text';
-    }
-    control.dataset.path = path;
-    label.append(control); group.append(label);
-  }
-  function build() {
-    const empty = schema.emptyProfile();
-    for (const [title, key] of [['Personal', 'personal'], ['Links', 'links'], ['Work authorization', 'workAuthorization'], ['Common answers', 'commonAnswers']]) {
-      const group = makeFieldset(title);
-      for (const [name, value] of Object.entries(empty[key])) addField(group, `${key}.${name}`, value);
-    }
-    const languages = makeFieldset('Languages');
-    const languageLabel = document.createElement('label');
-    languageLabel.className = 'wide';
-    languageLabel.textContent = 'Languages and proficiency';
-    const languageInput = document.createElement('textarea');
-    languageInput.dataset.path = 'languages';
-    languageInput.placeholder = 'English | Fluent\nPolish | Native';
-    const languageHint = document.createElement('span');
-    languageHint.className = 'hint';
-    languageHint.textContent = 'One language per line. Add a proficiency after | if you know it.';
-    languageLabel.append(languageInput, languageHint);
-    languages.append(languageLabel);
-    const group = makeFieldset('Experience, education, skills');
-    for (const [key, hint] of [
-      ['experience', 'JSON array of jobs. First entry is used for matching current company and title.'],
-      ['education', 'JSON array of schools. First entry is used for matching school and degree.'],
-      ['skills', 'One skill per line.']
-    ]) {
-      const label = document.createElement('label'); label.className = 'wide'; label.textContent = key[0].toUpperCase() + key.slice(1);
-      const control = document.createElement('textarea'); control.dataset.path = key; label.append(control);
-      const note = document.createElement('span'); note.className = 'hint'; note.textContent = hint; label.append(note); group.append(label);
+      group.append(heading, list); $('detailGroups').append(group);
     }
   }
-  function display(profile) {
-    for (const control of fieldsRoot.querySelectorAll('[data-path]')) {
-      const path = control.dataset.path;
-      const value = path.split('.').reduce((current, part) => current?.[part], profile);
-      control.value = path === 'skills' ? (value || []).join('\n') :
-        path === 'languages' ? schema.formatLanguageLines(value) :
-          Array.isArray(value) ? JSON.stringify(value, null, 2) : value === null ? '' : String(value ?? '');
-    }
+  function addRemember(row, item, summary) {
+    const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'remember-trigger'; trigger.textContent = 'Remember answer';
+    trigger.addEventListener('click', () => {
+      trigger.remove();
+      const form = document.createElement('form'); form.className = 'remember';
+      const input = document.createElement('input'); input.required = true; input.setAttribute('aria-label', `Answer for ${item.label}`);
+      const save = document.createElement('button'); save.type = 'submit'; save.textContent = 'Save';
+      form.append(input, save); row.append(form); input.focus();
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+          const profile = await storage.load();
+          profile.customAnswers = profile.customAnswers.filter(answer => !(answer.domain === summary.domain &&
+            answer.platform === summary.platform && answer.controlType === item.type && normalize(answer.question) === normalize(item.label)));
+          profile.customAnswers.push({ question: item.label, answer: input.value.trim(), controlType: item.type, domain: summary.domain, platform: summary.platform });
+          profile.customAnswers = profile.customAnswers.slice(-100);
+          await storage.save(profile);
+          form.replaceWith(document.createTextNode('Saved for this site.'));
+          message('Answer saved locally.', 'success');
+        } catch (error) { message(error.message, 'error'); }
+      });
+    });
+    row.append(trigger);
   }
-  function collect() {
-    const profile = schema.emptyProfile();
-    for (const control of fieldsRoot.querySelectorAll('[data-path]')) {
-      const path = control.dataset.path;
-      if (path === 'skills') { profile.skills = control.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean); continue; }
-      if (path === 'languages') { profile.languages = schema.parseLanguageLines(control.value); continue; }
-      if (path === 'experience' || path === 'education') {
-        const parsed = JSON.parse(control.value.trim() || '[]');
-        if (!Array.isArray(parsed)) throw new Error(`${path} must be a JSON array.`);
-        profile[path] = parsed; continue;
+  async function currentTab() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tab;
+  }
+  async function inspectPage() {
+    try {
+      const tab = await currentTab();
+      const url = new URL(tab?.url || '');
+      if (!/^https?:$/.test(url.protocol)) {
+        status('Browser page', 'Unavailable', 'error'); $('fill').disabled = true; return;
       }
-      const [group, key] = path.split('.');
-      profile[group][key] = control.tagName === 'SELECT' ? control.value === '' ? null : control.value === 'true' : control.value;
-    }
-    return schema.normalizeProfile(profile);
-  }
-  async function save() { const profile = collect(); await storage.save(profile); show('Profile saved locally.'); return profile; }
-  function downloadProfile(profile) {
-    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = 'openapply-profile.json'; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const host = url.hostname;
+      const platform = /(?:^|\.)greenhouse\.io$/.test(host) ? 'Greenhouse' :
+        /(?:^|\.)jobs\.lever\.co$/.test(host) ? 'Lever' :
+          /(?:^|\.)myworkdayjobs\.com$|(?:^|\.)myworkdaysite\.com$/.test(host) ? 'Workday' : 'Other site';
+      status(platform, platform === 'Other site' ? 'Check page' : 'Ready', platform === 'Other site' ? 'warning' : 'ready');
+    } catch { status('Page unavailable', 'Unavailable', 'error'); $('fill').disabled = true; }
   }
   async function fill() {
-    const button = document.getElementById('fill'); button.disabled = true;
+    const button = $('fill'); button.disabled = true; button.firstChild.textContent = 'Filling application ';
+    message('Scanning visible fields…');
     try {
-      const profile = await save();
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) throw new Error('No active tab found.');
-      for (const file of scriptFiles) {
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [file] });
-      }
+      const tab = await currentTab();
+      if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) throw new Error('Open an application page in a normal browser tab first.');
+      const profile = await storage.load();
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files });
       const [injection] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async data => globalThis.OpenApplyRun(data), args: [profile]
+        target: { tabId: tab.id }, func: data => globalThis.OpenApplyRun(data), args: [profile]
       });
-      const summary = injection.result;
-      if (summary.error) { show(summary.error, true); return; }
-      const unknown = [...new Set(summary.unknown)].slice(0, 12);
-      show(`${summary.platform}: ${summary.filled} filled, ${summary.skipped} skipped, ${summary.unknown.length} unknown.` +
-        (unknown.length ? `\nUnknown fields: ${unknown.join(', ')}` : '') +
-        (summary.details.some(item => item.result !== 'filled') ? `\nSkipped: ${summary.details.filter(item => item.result !== 'filled').slice(0, 8).map(item => `${item.label} (${item.result})`).join(', ')}` : ''));
-    } catch (error) { show(error.message || String(error), true); }
-    finally { button.disabled = false; }
+      const summary = injection?.result;
+      if (!summary || summary.error) throw new Error(summary?.error || 'Could not read the application page.');
+      await storage.saveLastResult(summary);
+      renderResult(summary);
+      message(`Finished. Review ${summary.review} field${summary.review === 1 ? '' : 's'} before submitting.`, 'success');
+    } catch (error) {
+      const protectedPage = /cannot access|cannot be scripted|permission|chrome:\/\//i.test(error.message || '');
+      message(protectedPage ? 'This page does not allow extension filling. Open the application itself and try again.' : error.message, 'error');
+    } finally { button.disabled = false; button.firstChild.textContent = 'Fill application '; }
   }
-  build();
-  storage.load().then(display).catch(error => show(error.message, true));
-  document.getElementById('edit').addEventListener('click', () => { editor.open = true; fieldsRoot.querySelector('input')?.focus(); });
-  document.getElementById('profileForm').addEventListener('submit', event => { event.preventDefault(); save().catch(error => show(error.message, true)); });
-  document.getElementById('fill').addEventListener('click', fill);
-  document.getElementById('import').addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', async () => {
-    try {
-      const file = fileInput.files?.[0]; if (!file) return;
-      const input = JSON.parse(await file.text());
-      const profile = Array.isArray(input.workExperience) ? schema.fromJobPrefill(input) : schema.normalizeProfile(input);
-      display(profile); editor.open = true; show('Imported into the editor. Review the fields and click Save Profile.');
-    } catch (error) { show(`Import failed: ${error.message}`, true); }
-    finally { fileInput.value = ''; }
-  });
-  document.getElementById('export').addEventListener('click', () => { try { downloadProfile(collect()); show('Profile exported.'); } catch (error) { show(error.message, true); } });
-  document.getElementById('clear').addEventListener('click', async () => {
-    if (!confirm('Clear the saved profile from this browser?')) return;
-    try { await storage.clear(); display(schema.emptyProfile()); show('Saved profile cleared.'); }
-    catch (error) { show(error.message, true); }
-  });
+  $('fill').addEventListener('click', fill);
+  $('edit').addEventListener('click', () => chrome.runtime.openOptionsPage());
+  Promise.all([storage.load(), storage.loadLastResult(), inspectPage()]).then(([profile, last]) => {
+    profileStatus(profile); renderResult(last);
+  }).catch(error => message(error.message, 'error'));
 })();

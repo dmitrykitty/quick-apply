@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Quick Apply icon">
+  <rect width="128" height="128" rx="27" fill="#195cbd"/>
+  <rect x="27" y="18" width="74" height="92" rx="9" fill="#ffffff"/>
+  <rect x="40" y="36" width="46" height="6" rx="3" fill="#9bbce7"/>
+  <rect x="40" y="50" width="33" height="6" rx="3" fill="#9bbce7"/>
+  <path d="M42 78l13 13 30-31" fill="none" stroke="#195cbd" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

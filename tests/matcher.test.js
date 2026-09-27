@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { normalize } = require('../src/utils/text');
-const { match, valueAt } = require('../src/content/fieldMatcher');
+const { match, valueAt, findCustomAnswer, isLearnableQuestion } = require('../src/content/fieldMatcher');
 
 const field = values => ({ label: '', ariaLabel: '', placeholder: '', name: '', id: '', nearby: '', ...values });
 
@@ -9,6 +9,48 @@ test('normalizes common labels and identifiers', () => {
   assert.equal(normalize('LegalFirstName *'), 'legal first name');
   assert.equal(normalize('first_name (Required)'), 'first name');
   assert.equal(normalize('Postal-Code'), 'postal code');
+  assert.equal(normalize('Przewidywana data ukończenia studiów'), 'przewidywana data ukonczenia studiow');
+  assert.equal(normalize('Łódź'), 'lodz');
+});
+
+test('matches Polish personal and education labels', () => {
+  assert.equal(match(field({ label: 'Imię', type: 'text' })).path, 'personal.firstName');
+  assert.equal(match(field({ label: 'Nazwisko', type: 'text' })).path, 'personal.lastName');
+  assert.equal(match(field({ label: 'Numer telefonu', type: 'tel' })).path, 'personal.phone');
+  assert.equal(match(field({ label: 'Uczelnia', type: 'text' })).path, 'education.0.institution');
+  assert.equal(match(field({ label: 'Poziom wykształcenia', type: 'text' })).path, 'education.0.degree');
+});
+
+test('matches skills, education and experience dates with context', () => {
+  assert.equal(match(field({ label: 'Skills', type: 'textarea' })).path, 'skills.summary');
+  assert.equal(match(field({ label: 'Expected graduation date', type: 'month' })).path, 'education.0.endDate');
+  assert.equal(match(field({ label: 'Przewidywana data ukończenia studiów', type: 'text' })).path, 'education.0.endDate');
+  assert.equal(match(field({ label: 'Start Date', context: 'Education', type: 'month' })).path, 'education.0.startDate');
+  assert.equal(match(field({ label: 'End Date', context: 'Work Experience', type: 'month' })).path, 'experience.0.endDate');
+  assert.equal(match(field({ label: 'Work location', type: 'text' })).path, 'experience.0.location');
+  assert.equal(match(field({ label: 'Current role', type: 'checkbox' })).path, 'experience.0.current');
+  assert.equal(match(field({ label: 'Job title', context: 'Experience', type: 'text' })).path, 'experience.0.title');
+  assert.equal(match(field({ label: 'Start Date', type: 'month' })), null);
+  assert.equal(valueAt({ education: [{ endDate: '2028-02' }] }, 'education.0.endDate'), '2028-02');
+});
+
+test('matches citizenship and explicit work authorization without broad guesses', () => {
+  assert.equal(match(field({ label: 'EU citizen', type: 'select' })).path, 'workAuthorization.euCitizen');
+  assert.equal(match(field({ label: 'Prawo do pracy w UE', type: 'radio' })).path, 'workAuthorization.authorizedInEU');
+  assert.equal(match(field({ label: 'Willing to relocate', type: 'checkbox' })).path, 'workAuthorization.willingToRelocate');
+  assert.equal(match(field({ label: 'Authorized to work', type: 'select' })).path, 'workAuthorization.genericAuthorized');
+  assert.equal(valueAt({ workAuthorization: { authorizedInEU: true, authorizedInUK: false } }, 'workAuthorization.genericAuthorized'), undefined);
+  assert.equal(valueAt({ workAuthorization: { authorizedInEU: true } }, 'workAuthorization.genericAuthorized'), true);
+});
+
+test('learned answers require exact safe question, type, and domain', () => {
+  const profile = { customAnswers: [{ question: 'How did you hear about us?', answer: 'Career fair', controlType: 'text', domain: 'jobs.example.test', platform: 'Lever' }] };
+  const question = field({ label: 'How did you hear about us?', type: 'text' });
+  assert.equal(findCustomAnswer(profile, question, 'Lever', 'jobs.example.test').answer, 'Career fair');
+  assert.equal(findCustomAnswer(profile, question, 'Lever', 'other.example.test'), null);
+  assert.equal(findCustomAnswer(profile, field({ label: 'Gender', type: 'text' }), 'Lever', 'jobs.example.test'), null);
+  assert.equal(findCustomAnswer(profile, field({ label: 'I agree to the privacy policy', type: 'radio' }), 'Lever', 'jobs.example.test'), null);
+  assert.equal(isLearnableQuestion('Yes'), false);
 });
 
 test('matches Greenhouse and Lever profile fields from varied metadata', () => {

@@ -1,8 +1,11 @@
 {
-  "name": "openapply-autofill",
-  "version": "0.1.0",
+  "name": "quick-apply",
+  "version": "0.2.0",
   "private": true,
-  "description": "Privacy-first MV3 job application autofill",
-  "scripts": { "test": "node --test tests/*.test.js" },
+  "description": "Privacy-first browser extension for autofilling repetitive job applications.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node tests/browser-smoke.cjs"
+  },
   "license": "MIT"
 }

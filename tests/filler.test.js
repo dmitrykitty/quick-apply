@@ -51,3 +51,16 @@ test('does not check a checkbox when the saved answer is false', () => {
   assert.equal(fill({ element, type: 'checkbox' }, false), 'already-filled');
   assert.equal(element.checked, false);
 });
+
+test('fills yes/no selects and YYYY-MM month fields, preserving existing values', () => {
+  const choice = new MockSelect([{ text: 'Choose', value: '' }, { text: 'Yes', value: 'yes' }, { text: 'No', value: 'no' }]);
+  assert.equal(fill({ element: choice, type: 'select' }, true), 'filled');
+  assert.equal(choice.value, 'yes');
+  const month = new MockInput();
+  assert.equal(fill({ element: month, type: 'month' }, '2028-02'), 'filled');
+  assert.equal(month.value, '2028-02');
+  assert.equal(fill({ element: month, type: 'month' }, '2029-01'), 'already-filled');
+  const text = new MockInput();
+  assert.equal(fill({ element: text, type: 'text', placeholder: 'MM/YYYY' }, '2028-02'), 'filled');
+  assert.equal(text.value, '02/2028');
+});

@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "OpenApply Autofill",
-  "version": "0.1.0",
-  "description": "Private, one-click job application autofill for Greenhouse, Lever, and common Workday fields.",
+  "name": "Quick Apply",
+  "version": "0.2.0",
+  "description": "Privacy-first browser extension for autofilling repetitive job applications.",
   "permissions": ["storage", "activeTab", "scripting"],
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
   "action": { "default_popup": "src/popup/popup.html" },
-  "options_page": "src/popup/popup.html"
+  "options_page": "src/options/options.html"
 }

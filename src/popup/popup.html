@@ -3,33 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>OpenApply Autofill</title>
+  <title>Quick Apply</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <main>
-    <header><h1>OpenApply Autofill</h1><p>Your profile stays in this browser.</p></header>
-    <div class="actions">
-      <button id="fill" class="primary" type="button">Fill Current Application</button>
-      <button id="edit" type="button">Edit Profile</button>
-    </div>
-    <section id="result" role="status" aria-live="polite"></section>
-    <details id="editor">
-      <summary>Profile editor</summary>
-      <form id="profileForm">
-        <div id="fields"></div>
-        <div class="actions bottom">
-          <button id="save" class="primary" type="submit">Save Profile</button>
-          <button id="import" type="button">Import Profile JSON</button>
-          <button id="export" type="button">Export Profile JSON</button>
-          <button id="clear" type="button">Clear Profile</button>
+    <header class="topbar">
+      <img src="../../icons/icon-32.png" width="32" height="32" alt="">
+      <div><h1>Quick Apply</h1><p>Review every field before submitting.</p></div>
+    </header>
+    <section class="site-row" aria-label="Current page">
+      <div><span class="eyebrow">Current page</span><strong id="platform">Checking page…</strong></div>
+      <span id="siteBadge" class="badge">Checking</span>
+    </section>
+    <button id="fill" class="fill-button" type="button">Fill application <span aria-hidden="true">→</span></button>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+    <section class="section" aria-labelledby="profileTitle">
+      <div class="section-head"><h2 id="profileTitle">Profile</h2><button id="edit" class="text-button" type="button">Edit profile <span aria-hidden="true">↗</span></button></div>
+      <ul id="profileStatus" class="profile-list"></ul>
+    </section>
+    <section class="section" aria-labelledby="resultTitle">
+      <div class="section-head"><h2 id="resultTitle">Last result</h2><span id="resultPlatform" class="muted"></span></div>
+      <div id="emptyResult" class="empty">Fill an application to see a field-by-field summary.</div>
+      <div id="resultBody" hidden>
+        <div class="counts" aria-label="Fill counts">
+          <div><strong id="filledCount">0</strong><span>Filled</span></div>
+          <div><strong id="skippedCount">0</strong><span>Skipped</span></div>
+          <div><strong id="reviewCount">0</strong><span>Need review</span></div>
         </div>
-      </form>
-    </details>
-    <input id="file" type="file" accept="application/json,.json" hidden>
+        <details id="resultDetails"><summary>View details</summary><div id="detailGroups"></div></details>
+      </div>
+    </section>
+    <footer>Private by design · Never submits forms</footer>
   </main>
   <script src="../profile/schema.js"></script>
   <script src="../profile/storage.js"></script>
+  <script src="../utils/text.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

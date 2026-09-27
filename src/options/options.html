@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Profile · Quick Apply</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="page-header">
+    <div class="brand"><img src="../../icons/icon-32.png" width="32" height="32" alt=""><span>Quick Apply</span><small>Profile</small></div>
+    <button class="primary" type="submit" form="profileForm">Save profile</button>
+  </header>
+  <div class="layout">
+    <nav aria-label="Profile sections">
+      <a href="#personal">Personal information</a><a href="#links">Links</a><a href="#education">Education</a>
+      <a href="#experience">Experience</a><a href="#skills">Skills</a><a href="#languages">Languages</a>
+      <a href="#authorization">Work authorization</a><a href="#answers">Common answers</a><a href="#data">Data &amp; privacy</a>
+    </nav>
+    <main>
+      <div class="intro"><h1>Your profile</h1><p>Save once, then fill supported application fields from the extension popup. Review each application before submitting.</p></div>
+      <p id="saveStatus" class="save-status" role="status" aria-live="polite"></p>
+      <form id="profileForm">
+        <section id="personal"><div class="section-heading"><h2>Personal information</h2></div><div id="personalFields" class="field-grid"></div></section>
+        <section id="links"><div class="section-heading"><h2>Links</h2></div><div id="linkFields" class="field-grid"></div></section>
+        <section id="education"><div class="section-heading"><div><h2>Education</h2><p>Add your most recent education first.</p></div><button id="addEducation" type="button" class="secondary">+ Add education</button></div><div id="educationList" class="entry-list"></div></section>
+        <section id="experience"><div class="section-heading"><div><h2>Experience</h2><p>Add your most recent role first.</p></div><button id="addExperience" type="button" class="secondary">+ Add experience</button></div><div id="experienceList" class="entry-list"></div></section>
+        <section id="skills"><div class="section-heading"><h2>Skills</h2></div><label class="field"><span>Add a skill and press Enter</span><input id="skillInput" type="text" autocomplete="off" placeholder="e.g. JavaScript"></label><div id="skillChips" class="chips" aria-label="Saved skills"></div></section>
+        <section id="languages"><div class="section-heading"><h2>Languages</h2><button id="addLanguage" type="button" class="secondary">+ Add language</button></div><div id="languageList" class="entry-list"></div></section>
+        <section id="authorization"><div class="section-heading"><h2>Work authorization</h2><p>Leave an answer unselected when it depends on the role or country.</p></div><div id="authorizationFields" class="choice-grid"></div></section>
+        <section id="answers"><div class="section-heading"><h2>Common answers</h2></div><div id="answerFields" class="choice-grid"></div></section>
+        <section id="data"><div class="section-heading"><div><h2>Data &amp; privacy</h2><p>Your profile stays in this browser. Imported résumé files are not stored.</p></div></div>
+          <div class="data-actions"><button id="import" type="button" class="secondary">Import JSON</button><button id="export" type="button" class="secondary">Export JSON</button><button id="clear" type="button" class="danger">Clear profile</button></div>
+          <input id="importFile" type="file" accept="application/json,.json" hidden>
+          <div class="learned"><h3>Remembered answers</h3><p>Saved only when you choose “Remember answer” after a fill.</p><ul id="customAnswersList"></ul></div>
+        </section>
+        <div class="bottom-action"><button type="submit" class="primary">Save profile</button></div>
+      </form>
+    </main>
+  </div>
+  <script src="../profile/schema.js"></script>
+  <script src="../profile/storage.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
