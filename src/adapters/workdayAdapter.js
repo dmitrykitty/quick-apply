@@ -6,12 +6,14 @@
         !!document.querySelector('[data-automation-id="jobPostingPage"], [data-automation-id="applyFlowPage"]');
     }
     scanFields() {
-      const fields = super.scanFields();
+      const application = document.querySelector('[data-automation-id="applyFlowPage"], form[data-automation-id="applyFlowForm"]');
+      if (!application) return [];
+      const fields = root.OpenApplyScanner.scan(application);
       for (const field of fields) {
         const container = field.element.closest('[data-automation-id="formField"], [data-automation-id="formFieldContainer"]');
         if (container) field.label ||= root.OpenApplyDom.text(container.querySelector('[data-automation-id="formFieldLabel"], label'));
       }
-      for (const element of document.querySelectorAll('[role="combobox"]')) {
+      for (const element of application.querySelectorAll('[role="combobox"]')) {
         if (!root.OpenApplyDom.visible(element) || fields.some(field => field.element === element)) continue;
         const container = element.closest('[data-automation-id="formField"], [data-automation-id="formFieldContainer"]');
         fields.push(root.OpenApplyScanner.metadata(element, {

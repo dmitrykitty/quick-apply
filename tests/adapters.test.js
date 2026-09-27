@@ -28,3 +28,13 @@ test('Greenhouse and Lever scan only their application form when present', () =>
     assert.equal(new Lever().scanFields(), application);
   } finally { globalThis.document = previousDocument; }
 });
+
+test('job listing pages without an application form have no fillable fields', () => {
+  const previousDocument = globalThis.document;
+  try {
+    globalThis.document = { querySelector: () => null };
+    assert.deepEqual(new Greenhouse().scanFields(), []);
+    assert.deepEqual(new Lever().scanFields(), []);
+    assert.deepEqual(new Workday().scanFields(), []);
+  } finally { globalThis.document = previousDocument; }
+});

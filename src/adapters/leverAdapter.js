@@ -6,7 +6,8 @@
         !!document.querySelector('form.application-form, .lever-application-form');
     }
     scanFields() {
-      return root.OpenApplyScanner.scan(document.querySelector('form.application-form, .lever-application-form') || document);
+      const application = document.querySelector('form.application-form, .lever-application-form');
+      return application ? root.OpenApplyScanner.scan(application) : [];
     }
   }
   root.OpenApplyLeverAdapter = LeverAdapter;

@@ -6,7 +6,8 @@
         !!document.querySelector('form#application_form, #grnhse_app');
     }
     scanFields() {
-      return root.OpenApplyScanner.scan(document.querySelector('#application_form, #grnhse_app') || document);
+      const application = document.querySelector('#application_form, #grnhse_app');
+      return application ? root.OpenApplyScanner.scan(application) : [];
     }
   }
   root.OpenApplyGreenhouseAdapter = GreenhouseAdapter;

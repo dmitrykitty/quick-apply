@@ -6,7 +6,9 @@
     async fillField(field, value) { return root.OpenApplyFiller.fill(field, value); }
     async fill(profile) {
       const summary = { platform: this.constructor.name.replace('Adapter', ''), filled: 0, skipped: 0, unknown: [], details: [] };
-      for (const field of this.scanFields()) {
+      const fields = this.scanFields();
+      if (!fields.length) return { ...summary, error: 'No visible application fields found on this page.' };
+      for (const field of fields) {
         const match = root.OpenApplyMatcher.match(field);
         const label = field.label || field.ariaLabel || field.name || field.id || 'Unlabeled field';
         if (!match) { summary.unknown.push(label); continue; }
