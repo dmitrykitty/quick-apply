@@ -1,0 +1,6 @@
+node_modules/
+coverage/
+*.log
+*.profile.json
+workdayfill-profile.json
+.DS_Store
