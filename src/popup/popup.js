@@ -58,6 +58,18 @@
       const group = makeFieldset(title);
       for (const [name, value] of Object.entries(empty[key])) addField(group, `${key}.${name}`, value);
     }
+    const languages = makeFieldset('Languages');
+    const languageLabel = document.createElement('label');
+    languageLabel.className = 'wide';
+    languageLabel.textContent = 'Languages and proficiency';
+    const languageInput = document.createElement('textarea');
+    languageInput.dataset.path = 'languages';
+    languageInput.placeholder = 'English | Fluent\nPolish | Native';
+    const languageHint = document.createElement('span');
+    languageHint.className = 'hint';
+    languageHint.textContent = 'One language per line. Add a proficiency after | if you know it.';
+    languageLabel.append(languageInput, languageHint);
+    languages.append(languageLabel);
     const group = makeFieldset('Experience, education, skills');
     for (const [key, hint] of [
       ['experience', 'JSON array of jobs. First entry is used for matching current company and title.'],
@@ -73,7 +85,9 @@
     for (const control of fieldsRoot.querySelectorAll('[data-path]')) {
       const path = control.dataset.path;
       const value = path.split('.').reduce((current, part) => current?.[part], profile);
-      control.value = path === 'skills' ? (value || []).join('\n') : Array.isArray(value) ? JSON.stringify(value, null, 2) : value === null ? '' : String(value ?? '');
+      control.value = path === 'skills' ? (value || []).join('\n') :
+        path === 'languages' ? schema.formatLanguageLines(value) :
+          Array.isArray(value) ? JSON.stringify(value, null, 2) : value === null ? '' : String(value ?? '');
     }
   }
   function collect() {
@@ -81,6 +95,7 @@
     for (const control of fieldsRoot.querySelectorAll('[data-path]')) {
       const path = control.dataset.path;
       if (path === 'skills') { profile.skills = control.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean); continue; }
+      if (path === 'languages') { profile.languages = schema.parseLanguageLines(control.value); continue; }
       if (path === 'experience' || path === 'education') {
         const parsed = JSON.parse(control.value.trim() || '[]');
         if (!Array.isArray(parsed)) throw new Error(`${path} must be a JSON array.`);

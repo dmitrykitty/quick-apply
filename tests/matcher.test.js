@@ -33,3 +33,13 @@ test('resolves derived name and first experience safely', () => {
   assert.equal(valueAt(profile, 'experience.0.company'), 'Example Co');
   assert.equal(valueAt(profile, 'experience.1.company'), undefined);
 });
+
+test('fills language lists but avoids guessing in repeated language rows', () => {
+  assert.equal(match(field({ label: 'Languages spoken' })).path, 'languages.summary');
+  assert.equal(match(field({ label: 'Language proficiency' })).path, 'languages.singleProficiency');
+  assert.equal(match(field({ label: 'Programming languages' })), null);
+  const multiple = { languages: [{ name: 'English', proficiency: 'Fluent' }, { name: 'Polish', proficiency: 'Native' }] };
+  assert.equal(valueAt(multiple, 'languages.summary'), 'English (Fluent), Polish (Native)');
+  assert.equal(valueAt(multiple, 'languages.singleName'), undefined);
+  assert.equal(valueAt({ languages: [multiple.languages[0]] }, 'languages.singleProficiency'), 'Fluent');
+});

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { emptyProfile, normalizeProfile, fromJobPrefill } = require('../src/profile/schema');
+const { emptyProfile, normalizeProfile, fromJobPrefill, parseLanguageLines, formatLanguageLines } = require('../src/profile/schema');
 
 test('normalizes profile and drops unknown data', () => {
   const profile = normalizeProfile({ personal: { firstName: '  Ada ', secret: 'do not persist' }, skills: [' JS ', '', 4] });
@@ -29,4 +29,16 @@ test('imports JobPrefill fields without embedded document data', () => {
 
 test('rejects unrelated JSON as JobPrefill', () => {
   assert.throws(() => fromJobPrefill({ personal: {} }), /Not a supported/);
+});
+
+test('languages round-trip through the editor format and normalized profile', () => {
+  const lines = ' English | Fluent\nPolish | Native\n French \n';
+  const languages = parseLanguageLines(lines);
+  assert.deepEqual(languages, [
+    { name: 'English', proficiency: 'Fluent' },
+    { name: 'Polish', proficiency: 'Native' },
+    { name: 'French', proficiency: '' }
+  ]);
+  assert.equal(formatLanguageLines(languages), 'English | Fluent\nPolish | Native\nFrench');
+  assert.deepEqual(normalizeProfile({ languages }).languages, languages);
 });

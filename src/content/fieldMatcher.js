@@ -20,6 +20,9 @@
     'education.0.institution': ['school', 'university', 'institution', 'college'],
     'education.0.degree': ['degree'],
     'education.0.fieldOfStudy': ['field of study', 'major'],
+    'languages.summary': ['languages', 'languages spoken', 'spoken languages', 'languages you speak'],
+    'languages.singleName': ['language', 'primary language', 'native language'],
+    'languages.singleProficiency': ['language proficiency', 'language fluency', 'fluency level'],
     'commonAnswers.previousEmployee': ['previous employee', 'worked here before', 'previously employed'],
     'commonAnswers.age18Plus': ['at least 18', '18 years of age', 'over 18'],
     'commonAnswers.sponsorshipRequired': ['require sponsorship', 'need sponsorship', 'visa sponsorship'],
@@ -32,7 +35,7 @@
     'workAuthorization.requiresVisaUS': ['require visa in us', 'require sponsorship in us']
   };
   const weights = { label: 110, ariaLabel: 105, name: 85, id: 80, placeholder: 75, nearby: 45 };
-  const BLOCKED = /\b(reference|referral|referee|referrer|recommender|emergency|manager|recruiter|friend|spouse|parent|guardian)\b/;
+  const BLOCKED = /\b(reference|referral|referee|referrer|recommender|emergency|manager|recruiter|friend|spouse|parent|guardian|programming|coding)\b/;
   function scoreText(value, alias, weight) {
     const text = normalize(value);
     const term = normalize(alias);
@@ -59,6 +62,11 @@
   }
   function valueAt(profile, path) {
     if (path === 'personal.fullName') return [profile.personal?.firstName, profile.personal?.lastName].filter(Boolean).join(' ');
+    if (path === 'languages.summary') return (profile.languages || []).map(item => `${item.name}${item.proficiency ? ` (${item.proficiency})` : ''}`).join(', ');
+    if (path === 'languages.singleName' || path === 'languages.singleProficiency') {
+      if (profile.languages?.length !== 1) return undefined;
+      return path === 'languages.singleName' ? profile.languages[0].name : profile.languages[0].proficiency;
+    }
     return path.split('.').reduce((value, key) => value?.[key], profile);
   }
   root.OpenApplyMatcher = { match, valueAt, aliases };

@@ -7,6 +7,7 @@
     education: [],
     experience: [],
     skills: [],
+    languages: [],
     workAuthorization: { euCitizen: null, authorizedInEU: null, requiresVisaEU: null, authorizedInUK: null, requiresVisaUK: null, authorizedInUS: null, requiresVisaUS: null, willingToRelocate: null },
     commonAnswers: { previousEmployee: null, age18Plus: null, sponsorshipRequired: null, relocation: null }
   });
@@ -31,10 +32,25 @@
       endDate: string(item.endDate), current: boolean(item.current) === true, description: string(item.description)
     })) : [];
     profile.skills = Array.isArray(input.skills) ? input.skills.filter(item => typeof item === 'string').map(string).filter(Boolean).slice(0, 200) : [];
+    profile.languages = Array.isArray(input.languages) ? input.languages.slice(0, 50).map(item =>
+      typeof item === 'string' ? { name: string(item), proficiency: '' } :
+        { name: string(item?.name), proficiency: string(item?.proficiency) }
+    ).filter(item => item.name) : [];
     for (const group of ['workAuthorization', 'commonAnswers']) {
       for (const key of Object.keys(profile[group])) profile[group][key] = boolean(input[group]?.[key]);
     }
     return profile;
+  }
+
+  function parseLanguageLines(text) {
+    return String(text ?? '').split(/\r?\n/).map(line => {
+      const [name, ...proficiency] = line.split('|');
+      return { name: string(name), proficiency: string(proficiency.join('|')) };
+    }).filter(item => item.name);
+  }
+
+  function formatLanguageLines(languages) {
+    return (languages || []).map(item => `${item.name}${item.proficiency ? ` | ${item.proficiency}` : ''}`).join('\n');
   }
 
   // Convert the user's JobPrefill export at import time; never bundle profile data.
@@ -60,6 +76,7 @@
         current: item.currentRole, description: item.description
       })),
       skills: input.skills,
+      languages: input.languages,
       workAuthorization: { willingToRelocate: d.willingToRelocate },
       commonAnswers: {
         previousEmployee: d.workedHereBefore, age18Plus: d.atLeast18,
@@ -68,7 +85,7 @@
     });
   }
 
-  const api = { emptyProfile, normalizeProfile, fromJobPrefill };
+  const api = { emptyProfile, normalizeProfile, fromJobPrefill, parseLanguageLines, formatLanguageLines };
   root.OpenApplySchema = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);
