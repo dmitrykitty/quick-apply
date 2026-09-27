@@ -104,7 +104,9 @@
       const profile = await save();
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('No active tab found.');
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: scriptFiles });
+      for (const file of scriptFiles) {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [file] });
+      }
       const [injection] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: async data => globalThis.OpenApplyRun(data), args: [profile]

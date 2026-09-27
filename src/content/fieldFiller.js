@@ -34,4 +34,5 @@
     return events.setNativeValue(element, String(value)) ? 'filled' : 'unsupported-control';
   }
   root.OpenApplyFiller = { fill };
+  if (typeof module !== 'undefined') module.exports = { fill };
 })(globalThis);

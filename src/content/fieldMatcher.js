@@ -32,7 +32,7 @@
     'workAuthorization.requiresVisaUS': ['require visa in us', 'require sponsorship in us']
   };
   const weights = { label: 110, ariaLabel: 105, name: 85, id: 80, placeholder: 75, nearby: 45 };
-  const BLOCKED = /\b(reference|referral|emergency|manager|recruiter|friend|spouse|parent|guardian)\b/;
+  const BLOCKED = /\b(reference|referral|referee|referrer|recommender|emergency|manager|recruiter|friend|spouse|parent|guardian)\b/;
   function scoreText(value, alias, weight) {
     const text = normalize(value);
     const term = normalize(alias);
