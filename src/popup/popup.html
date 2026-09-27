@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OpenApply Autofill</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header><h1>OpenApply Autofill</h1><p>Your profile stays in this browser.</p></header>
+    <div class="actions">
+      <button id="fill" class="primary" type="button">Fill Current Application</button>
+      <button id="edit" type="button">Edit Profile</button>
+    </div>
+    <section id="result" role="status" aria-live="polite"></section>
+    <details id="editor">
+      <summary>Profile editor</summary>
+      <form id="profileForm">
+        <div id="fields"></div>
+        <div class="actions bottom">
+          <button id="save" class="primary" type="submit">Save Profile</button>
+          <button id="import" type="button">Import Profile JSON</button>
+          <button id="export" type="button">Export Profile JSON</button>
+          <button id="clear" type="button">Clear Profile</button>
+        </div>
+      </form>
+    </details>
+    <input id="file" type="file" accept="application/json,.json" hidden>
+  </main>
+  <script src="../profile/schema.js"></script>
+  <script src="../profile/storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
