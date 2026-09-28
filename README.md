@@ -7,12 +7,14 @@ Quick Apply is a privacy-first Chrome and Edge extension for autofilling repetit
 1. Clone or download this repository.
 2. Open `chrome://extensions` or `edge://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`. There is no build step.
 3. Open Quick Apply and choose **Edit profile**. Add your information in the full-size options page and save it.
-4. Open an application and click **Fill application** in the popup. Review the Filled, Skipped, and Need review sections before you submit the form yourself.
-5. On a later Workday step, advance manually and click **Fill application** again. Each click scans the current DOM afresh.
+4. Open an application and click **Fill Current Application** in the popup. Review the Filled, Skipped, and Need review sections before you submit the form yourself.
+5. On a later Workday step, advance manually and click **Fill Current Application** again. Each click scans the current DOM afresh.
 
-The options page supports personal details, links, repeatable education and experience entries, skill chips, repeatable language rows, work authorization, and common yes/no answers. Education and experience dates accept `YYYY-MM`; older saved education years remain visible as `YYYY` until you refine them. The first entry should be the most recent.
+The options page supports personal details, links, application defaults, repeatable work and education cards, skill chips, languages, work authorization defaults and jurisdiction overrides, and tri-state declarations. Education institution, degree, and field alternatives are ordered chips. Work and education dates use separate month and year controls and save as `YYYY-MM`; older saved year-only education dates remain available until you refine them. Put the most recent entry first. The phone-country selector uses a local country and calling-code list, with a two-letter ISO code option for unlisted countries.
 
-**Import JSON** accepts a Quick Apply export or a JobPrefill profile. Imported data is displayed for review before you save. JobPrefill résumé content and voluntary disclosures are excluded. **Export JSON** downloads your current profile, including remembered answers, so treat the file as private. **Clear profile** requires confirmation.
+Voluntary disclosures are optional and have **Autofill voluntary disclosures** off by default. Saved disclosure answers are skipped unless you enable it. Option controls require an exact normalized match.
+
+**Import Profile JSON** accepts a schema v2 Quick Apply export, an older Quick Apply profile, or a JobPrefill profile. Imports are validated and displayed for review before you save. JobPrefill résumé content is excluded, and its voluntary disclosures remain disabled for autofill. **Export Profile JSON** downloads your current profile, including remembered answers, so treat the file as private. **Download JSON Template** downloads fixed example data that never includes your profile. **Clear profile** requires confirmation.
 
 ## Supported forms
 
@@ -20,9 +22,9 @@ The options page supports personal details, links, repeatable education and expe
 | --- | --- | --- |
 | Greenhouse | Visible standard text, email, phone, textarea, native select, radio, and safe checkbox fields inside its application form. | Embedded variations and custom widgets may need manual review. |
 | Lever | Standard application controls, including a derived full name. | Custom questions need an explicit remembered answer. |
-| Workday | Standard controls, `YYYY-MM` month fields, and comboboxes with a linked or newly opened listbox. Search is used only for clearly editable controls; an exact unique option is required. | Calendar widgets, ambiguous dropdowns, uploads, and many tenant-specific controls remain manual. |
+| Workday | Standard controls, `YYYY-MM` month fields, and comboboxes with a linked or newly opened listbox. For education options it tries the canonical value, then alternatives in saved order. Search is used only for clearly editable controls; an exact unique option is required. | Calendar widgets, ambiguous dropdowns, uploads, and many tenant-specific controls remain manual. |
 
-The weighted matcher reads labels, ARIA labels, associated label IDs, identifiers, placeholders, and nearby section context. It supports common English and Polish labels, including **expected graduation date** and **przewidywana data ukończenia studiów**. Generic history dates require education or experience context. Low-confidence or tied matches are left for review. Existing nonempty answers are preserved.
+The weighted matcher reads labels, ARIA labels, associated label IDs, identifiers, placeholders, and nearby section context. It supports common English and Polish labels, including **expected graduation date** and **przewidywana data ukończenia studiów**. Generic history dates require education or experience context. Low-confidence, tied, or ambiguous jurisdiction matches are left for review. Existing nonempty answers are preserved.
 
 When Workday exposes explicit repeated education or experience rows, Quick Apply maps them to matching profile entries. If it cannot identify a repeated row safely, it reports the field for review instead of copying the first entry into every row. Each dropdown wait is bounded; the extension never clicks Next or Submit.
 
@@ -36,7 +38,7 @@ Quick Apply has no backend, telemetry, analytics, remote code, automatic submiss
 
 ## Architecture
 
-- `src/profile/` normalizes, migrates, imports, and stores profiles.
+- `src/profile/` normalizes, migrates, imports, and stores schema v2 profiles. The phone-country list is bundled locally.
 - `src/content/` scans visible controls, scores matches, fills controls, and summarizes results.
 - `src/adapters/` detects ATS platforms and handles their specific DOM behavior. Workday helpers manage bounded waits and associated dropdowns.
 - `src/utils/` contains DOM, Unicode text, and native event helpers.
@@ -64,7 +66,7 @@ Use Node 20 or newer and installed Chrome, or set `QUICK_APPLY_BROWSER_CHANNEL=m
 Manual checklist:
 
 1. Load the extension unpacked in Chrome and Edge; check the icon, popup, and options page.
-2. Import a profile, verify old education years and month-level dates, save, close, and reopen the editor.
+2. Import a profile, verify old education years and month-level dates, alternatives, phone country, and work authorization overrides; save, close, and reopen the editor.
 3. Try a Greenhouse and Lever application. Confirm prefilled answers stay unchanged and unknown questions appear under Need review.
 4. Try several Workday steps. Check an exact dropdown match, a search dropdown, expected graduation month, and a control that must be skipped.
 5. Save one nonsensitive remembered answer, refill the same site, then remove it. Confirm sensitive questions have no Remember option.
