@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   const storage = globalThis.OpenApplyStorage;
+  const profiles = globalThis.OpenApplyProfiles;
   const normalize = globalThis.OpenApplyText.normalize;
   const files = [
     'src/utils/text.js', 'src/utils/dom.js', 'src/utils/events.js', 'src/profile/countries.js',
@@ -37,11 +38,23 @@
       $('profileStatus').append(item);
     }
   }
+  function showCollection(collection) {
+    const select = $('activeProfile');
+    select.replaceChildren();
+    for (const item of collection.profiles) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name;
+      select.append(option);
+    }
+    select.value = collection.activeProfileId;
+    profileStatus(profiles.resolve(collection));
+  }
   function renderResult(summary) {
     if (!summary || summary.error) return;
     $('emptyResult').hidden = true;
     $('resultBody').hidden = false;
-    $('resultPlatform').textContent = summary.platform;
+    $('resultPlatform').textContent = summary.profileName ? `${summary.platform} · ${summary.profileName}` : summary.platform;
     $('filledCount').textContent = summary.filled;
     $('skippedCount').textContent = summary.skipped;
     $('reviewCount').textContent = summary.review;
@@ -76,12 +89,14 @@
       form.addEventListener('submit', async event => {
         event.preventDefault();
         try {
-          const profile = await storage.load();
+          const collection = await storage.loadCollection();
+          const profileId = summary.profileId || collection.activeProfileId;
+          const profile = profiles.resolve(collection, profileId);
           profile.customAnswers = profile.customAnswers.filter(answer => !(answer.domain === summary.domain &&
             answer.platform === summary.platform && answer.controlType === item.type && normalize(answer.question) === normalize(item.label)));
           profile.customAnswers.push({ question: item.label, answer: input.value.trim(), controlType: item.type, domain: summary.domain, platform: summary.platform });
           profile.customAnswers = profile.customAnswers.slice(-100);
-          await storage.save(profile);
+          await storage.save(profile, profileId);
           form.replaceWith(document.createTextNode('Saved for this site.'));
           message('Answer saved locally.', 'success');
         } catch (error) { message(error.message, 'error'); }
@@ -113,13 +128,16 @@
     try {
       const tab = await currentTab();
       if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) throw new Error('Open an application page in a normal browser tab first.');
-      const profile = await storage.load();
+      const collection = await storage.loadCollection();
+      const profile = profiles.resolve(collection);
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files });
       const [injection] = await chrome.scripting.executeScript({
         target: { tabId: tab.id }, func: data => globalThis.OpenApplyRun(data), args: [profile]
       });
       const summary = injection?.result;
       if (!summary || summary.error) throw new Error(summary?.error || 'Could not read the application page.');
+      summary.profileId = collection.activeProfileId;
+      summary.profileName = collection.profiles.find(item => item.id === collection.activeProfileId).name;
       await storage.saveLastResult(summary);
       renderResult(summary);
       message(`Finished. Review ${summary.review} field${summary.review === 1 ? '' : 's'} before submitting.`, 'success');
@@ -130,7 +148,15 @@
   }
   $('fill').addEventListener('click', fill);
   $('edit').addEventListener('click', () => chrome.runtime.openOptionsPage());
-  Promise.all([storage.load(), storage.loadLastResult(), inspectPage()]).then(([profile, last]) => {
-    profileStatus(profile); renderResult(last);
+  $('activeProfile').addEventListener('change', async () => {
+    const id = $('activeProfile').value;
+    try {
+      const collection = await storage.selectProfile(id);
+      showCollection(collection);
+      message(`Selected ${collection.profiles.find(item => item.id === id).name}.`, 'success');
+    } catch (error) { message(error.message, 'error'); }
+  });
+  Promise.all([storage.loadCollection(), storage.loadLastResult(), inspectPage()]).then(([collection, last]) => {
+    showCollection(collection); renderResult(last);
   }).catch(error => message(error.message, 'error'));
 })();

@@ -18,11 +18,11 @@ const contentFiles = [
     await page.goto('data:text/html,' + encodeURIComponent(read('src/options/options.html')));
     await page.addStyleTag({ content: read('src/options/options.css') });
     await page.evaluate(() => { window.__store = {}; window.chrome = { storage: { local: {
-      get: async key => ({ [key]: window.__store[key] }),
+      get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, window.__store[key]])),
       set: async values => Object.assign(window.__store, values),
       remove: async keys => { for (const key of Array.isArray(keys) ? keys : [keys]) delete window.__store[key]; }
     } } }; });
-    for (const file of ['src/profile/schema.js', 'src/profile/countries.js', 'src/profile/storage.js', 'src/options/options.js']) {
+    for (const file of ['src/profile/schema.js', 'src/profile/countries.js', 'src/profile/profileSet.js', 'src/profile/storage.js', 'src/options/options.js']) {
       await page.addScriptTag({ content: read(file) });
     }
     await page.locator('#personalFields [data-key="firstName"]').fill('Ada');
@@ -55,7 +55,7 @@ const contentFiles = [
     await page.locator('#skillInput').fill('JavaScript');
     await page.locator('#skillInput').press('Enter');
     await page.locator('button[form="profileForm"]').click();
-    const profile = await page.evaluate(() => window.__store.openApplyProfile);
+    const profile = await page.evaluate(() => window.OpenApplyProfiles.resolve(window.__store.quickApplyProfiles));
     assert.equal(profile.personal.firstName, 'Ada');
     assert.equal(profile.education[0].graduationDate, '2028-02');
     assert.deepEqual(profile.education[0].institutionAlternatives, ['Alternate University']);
@@ -64,15 +64,52 @@ const contentFiles = [
     assert.equal(profile.experience[0].endDate, '');
     assert.deepEqual(profile.skills, ['JavaScript']);
     assert.equal(profile.languages[0].name, 'English');
+    await page.locator('#duplicateProfile').click();
+    await page.locator('#profileName').fill('Remote roles');
+    await page.locator('#personalFields [data-key="city"]').fill('Berlin');
+    await page.locator('button[form="profileForm"]').click();
+    const variantId = await page.evaluate(() => window.__store.activeProfileId);
+    const variants = await page.evaluate(() => window.__store.quickApplyProfiles.profiles);
+    assert.equal(variants.length, 2);
+    assert.equal(variants[1].name, 'Remote roles');
+    assert.equal(variants[1].baseProfileId, 'default');
+    assert.deepEqual(variants[1].overrides, { personal: { city: 'Berlin' } });
+    await page.locator('#personalFields [data-key="city"]').fill('Prague');
+    await page.locator('#profileSelect').selectOption('default');
+    await page.locator('#profileSelect').selectOption(variantId);
+    assert.equal(await page.locator('#personalFields [data-key="city"]').inputValue(), 'Prague');
+    await page.locator('#personalFields [data-key="city"]').fill('Berlin');
+    await page.locator('#createProfile').click();
+    await page.locator('#profileName').fill('Independent');
+    await page.locator('button[form="profileForm"]').click();
+    assert.equal(await page.evaluate(() => window.__store.quickApplyProfiles.profiles.length), 3);
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#deleteProfile').click();
+    await page.locator('button[form="profileForm"]').click();
+    assert.equal(await page.evaluate(() => window.__store.quickApplyProfiles.profiles.length), 2);
+    await page.locator('#profileSelect').selectOption(variantId);
+    await page.locator('button[form="profileForm"]').click();
     await page.evaluate(() => {
       URL.createObjectURL = blob => { window.__templateBlob = blob; return 'blob:example'; };
       HTMLAnchorElement.prototype.click = () => {};
     });
     await page.locator('#template').click();
     const template = await page.evaluate(async () => JSON.parse(await window.__templateBlob.text()));
-    assert.equal(template.schemaVersion, 2);
-    assert.equal(template.personal.firstName, 'Ada');
-    assert.notEqual(template.personal.lastName, profile.personal.lastName);
+    assert.equal(template.schemaVersion, 3);
+    assert.deepEqual(template.profiles.map(item => item.name), ['Example base', 'Example variant']);
+    assert.equal(template.profiles[0].overrides.personal.firstName, 'Ada');
+    assert.notEqual(template.profiles[0].overrides.personal.lastName, profile.personal.lastName);
+    await page.locator('#export').click();
+    const exported = await page.evaluate(async () => JSON.parse(await window.__templateBlob.text()));
+    assert.equal(exported.schemaVersion, 3);
+    assert.deepEqual(exported.profiles.map(item => item.name), ['Default', 'Remote roles']);
+    assert.equal(exported.activeProfileId, variantId);
+    const imported = JSON.parse(JSON.stringify(exported));
+    imported.profiles[0].name = 'Imported base';
+    await page.locator('#importFile').setInputFiles({ name: 'profiles.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imported)) });
+    assert.equal(await page.evaluate(() => window.__store.quickApplyProfiles.profiles[0].name), 'Default');
+    await page.locator('button[form="profileForm"]').click();
+    assert.equal(await page.evaluate(() => window.__store.quickApplyProfiles.profiles[0].name), 'Imported base');
     console.log('Options editor: PASS');
 
     for (const [fixture, expectedPlatform] of [
@@ -123,11 +160,12 @@ const contentFiles = [
     const popup = await browser.newPage({ viewport: { width: 400, height: 620 } });
     await popup.goto('data:text/html,' + encodeURIComponent(read('src/popup/popup.html')));
     await popup.addStyleTag({ content: read('src/popup/popup.css') });
+    const savedCollection = await page.evaluate(() => window.__store.quickApplyProfiles);
     await popup.evaluate(saved => {
-      window.__store = { openApplyProfile: saved };
+      window.__store = { quickApplyProfiles: saved, activeProfileId: saved.activeProfileId };
       window.chrome = {
         storage: { local: {
-          get: async key => ({ [key]: window.__store[key] }),
+          get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, window.__store[key]])),
           set: async values => Object.assign(window.__store, values),
           remove: async keys => { for (const key of Array.isArray(keys) ? keys : [keys]) delete window.__store[key]; }
         } },
@@ -142,18 +180,25 @@ const contentFiles = [
           ]
         } }] }
       };
-    }, profile);
-    for (const file of ['src/profile/schema.js', 'src/profile/countries.js', 'src/profile/storage.js', 'src/utils/text.js', 'src/popup/popup.js']) {
+    }, savedCollection);
+    for (const file of ['src/profile/schema.js', 'src/profile/countries.js', 'src/profile/profileSet.js', 'src/profile/storage.js', 'src/utils/text.js', 'src/popup/popup.js']) {
       await popup.addScriptTag({ content: read(file) });
     }
+    assert.equal(await popup.locator('#activeProfile').inputValue(), variantId);
+    await popup.locator('#activeProfile').selectOption('default');
+    assert.equal(await popup.evaluate(() => window.__store.activeProfileId), 'default');
+    await popup.locator('#activeProfile').selectOption(variantId);
+    assert.equal(await popup.evaluate(() => window.__store.activeProfileId), variantId);
     await popup.locator('#fill').click();
     assert.equal(await popup.locator('#filledCount').textContent(), '2');
+    assert.match(await popup.locator('#resultPlatform').textContent(), /Remote roles/);
     await popup.locator('#resultDetails').evaluate(element => element.open = true);
     await popup.locator('.remember-trigger').click();
     await popup.locator('.remember input').fill('University career fair');
     await popup.locator('.remember button').click();
-    const savedAnswers = await popup.evaluate(() => window.__store.openApplyProfile.customAnswers);
+    const savedAnswers = await popup.evaluate(() => window.OpenApplyProfiles.resolve(window.__store.quickApplyProfiles).customAnswers);
     assert.equal(savedAnswers[0].answer, 'University career fair');
+    assert.deepEqual(await popup.evaluate(() => window.OpenApplyProfiles.resolve(window.__store.quickApplyProfiles, 'default').customAnswers), []);
     await popup.locator('#edit').click();
     assert.equal(await popup.evaluate(() => window.__openedOptions), true);
     console.log('Popup summary and remembered answer: PASS');

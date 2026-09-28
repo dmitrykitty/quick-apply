@@ -59,6 +59,8 @@ h2 { font-size: 19px; letter-spacing: -.025em; margin: 0; }
 .learned li small { display: block; color: #718096; }
 .bottom-action { padding: 6px 0 30px; }
 .extra-fields { margin-top: 15px; }
+.profile-manager { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 18px; }
+#profileBase { margin: 10px 0 16px; }
 .date-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .date-field[hidden] { display: none; }
 .tag-editor { grid-column: 1 / -1; }
@@ -77,4 +79,4 @@ h2 { font-size: 19px; letter-spacing: -.025em; margin: 0; }
 .danger { color: #a52e36; background: #fff; border: 1px solid #e3b8bd; }
 .danger:hover { background: #fff1f2; }
 @media (max-width: 760px) { .layout { display: block; padding: 26px 18px 70px; } nav { position: static; display: flex; overflow-x: auto; margin-bottom: 24px; white-space: nowrap; } nav a { flex: none; } .page-header { padding: 0 18px; } }
-@media (max-width: 520px) { .field-grid, .override-row { grid-template-columns: 1fr; } .choice-item legend { width: 100%; } .language-row { grid-template-columns: 1fr 1fr; } .language-row .remove { grid-column: 1 / -1; justify-self: start; } }
+@media (max-width: 520px) { .field-grid, .override-row, .profile-manager { grid-template-columns: 1fr; } .choice-item legend { width: 100%; } .language-row { grid-template-columns: 1fr 1fr; } .language-row .remove { grid-column: 1 / -1; justify-self: start; } }

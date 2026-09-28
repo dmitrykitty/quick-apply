@@ -5,12 +5,14 @@
   const clone = value => JSON.parse(JSON.stringify(value));
   const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
   const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const unsafeKeys = new Set(['__proto__', 'prototype', 'constructor']);
   const validName = value => typeof value === 'string' && value.trim() ? value.trim() : null;
 
   function merge(base, overrides) {
     if (!object(base) || !object(overrides)) return clone(overrides);
     const result = clone(base);
     for (const [key, value] of Object.entries(overrides)) {
+      if (unsafeKeys.has(key)) continue;
       result[key] = object(value) && object(result[key]) ? merge(result[key], value) : clone(value);
     }
     return result;

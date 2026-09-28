@@ -100,6 +100,15 @@ test('collection import rejects missing names, duplicate IDs, and cycles', () =>
   assert.throws(() => profiles.importCollection(cycle), /cycle/);
 });
 
+test('import ignores prototype keys in override JSON', () => {
+  const collection = profiles.emptyCollection();
+  collection.profiles[0].overrides = JSON.parse('{"personal":{"firstName":"Ada"},"__proto__":{"polluted":true}}');
+  const imported = profiles.importCollection(collection);
+  assert.equal({}.polluted, undefined);
+  assert.equal(imported.profiles[0].overrides.personal.firstName, 'Ada');
+  assert.equal(Object.prototype.hasOwnProperty.call(imported.profiles[0].overrides, '__proto__'), false);
+});
+
 test('example collection contains fixed named profiles with no user data', () => {
   const example = profiles.exampleCollection();
   assert.equal(example.schemaVersion, 3);

@@ -2,6 +2,7 @@
   'use strict';
 
   const schema = globalThis.OpenApplySchema,
+    profiles = globalThis.OpenApplyProfiles,
     storage = globalThis.OpenApplyStorage,
     countries = globalThis.OpenApplyCountries,
     $ = id => document.getElementById(id);
@@ -27,7 +28,9 @@
   const mainDeclarations = ['openToFutureOpportunities', 'willingToRelocate', 'needsRelocationAssistance', 'workedHereBefore', 'age18Plus'];
   const authFields = [['defaultAuthorizedToWork', 'Authorized to work'], ['defaultRequiresSponsorship', 'Require sponsorship']];
   let skills = [],
-    customAnswers = [];
+    customAnswers = [],
+    collection = null,
+    showingId = null;
   function status(message, error = false) {
     $('saveStatus').textContent = message;
     $('saveStatus').classList.toggle('error', error);
@@ -468,6 +471,44 @@
     p.customAnswers = customAnswers;
     return schema.normalizeProfile(p);
   }
+  function renderCollection() {
+    const select = $('profileSelect');
+    select.replaceChildren();
+    for (const item of collection.profiles) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name;
+      select.append(option);
+    }
+    showingId = collection.activeProfileId;
+    select.value = showingId;
+    const current = collection.profiles.find(item => item.id === showingId);
+    $('profileName').value = current.name;
+    const base = collection.profiles.find(item => item.id === current.baseProfileId);
+    $('profileBase').textContent = base ? `Variant of ${base.name}. Unchanged fields follow the base profile.` : 'Independent base profile.';
+    render(profiles.resolve(collection, showingId));
+  }
+  function stashCurrent() {
+    if (!collection || !showingId) return;
+    collection = profiles.setProfile(collection, showingId, collect());
+    collection = profiles.renameProfile(collection, showingId, $('profileName').value);
+  }
+  function changeCollection(action, message) {
+    try {
+      stashCurrent();
+      collection = action(collection);
+      renderCollection();
+      status(message || 'Unsaved profile changes. Save to use them in the popup.');
+    } catch (error) {
+      $('profileSelect').value = showingId;
+      status(error.message, true);
+    }
+  }
+  function newProfileName() {
+    let number = 1;
+    while (collection.profiles.some(item => item.name.toLowerCase() === `new profile ${number}`)) number++;
+    return `New profile ${number}`;
+  }
   function download(profile, name) {
     const blob = new Blob([JSON.stringify(profile, null, 2)], {
         type: 'application/json'
@@ -482,15 +523,31 @@
   $('profileForm').addEventListener('submit', async e => {
     e.preventDefault();
     try {
-      const saved = await storage.save(collect());
-      render(saved);
-      status('Profile saved in this browser.');
+      stashCurrent();
+      collection = await storage.saveCollection(collection);
+      renderCollection();
+      status('Profiles saved in this browser.');
     } catch (error) {
       status(error.message, true);
     }
   });
   $('profileForm').addEventListener('input', dirty);
   $('profileForm').addEventListener('change', dirty);
+  $('profileSelect').addEventListener('change', event => {
+    event.stopPropagation();
+    const id = $('profileSelect').value;
+    changeCollection(current => profiles.selectProfile(current, id), 'Selected profile changed. Save to use it in the popup.');
+  });
+  $('createProfile').addEventListener('click', () => {
+    changeCollection(current => profiles.createProfile(current, newProfileName()), 'Blank profile created. Save to keep it.');
+  });
+  $('duplicateProfile').addEventListener('click', () => {
+    changeCollection(current => profiles.duplicateProfile(current, showingId), 'Linked variant created. Save to keep it.');
+  });
+  $('deleteProfile').addEventListener('click', () => {
+    if (!confirm('Delete this profile? Variants will keep their effective answers. Save to apply the change.')) return;
+    changeCollection(current => profiles.deleteProfile(current, showingId), 'Profile deleted in the editor. Save to apply the change.');
+  });
   $('skillInput').addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -519,8 +576,9 @@
       const file = $('importFile').files?.[0];
       if (!file) return;
       const input = JSON.parse(await file.text());
-      render(schema.importProfile(input));
-      status('Imported. Review the fields and save your profile.');
+      collection = profiles.importCollection(input);
+      renderCollection();
+      status('Imported profiles. Review them and save to replace your saved collection.');
     } catch (error) {
       status(`Import failed: ${error.message}`, true);
     } finally {
@@ -528,25 +586,30 @@
     }
   });
   $('export').addEventListener('click', () => {
-    download(collect(), 'quick-apply-profile.json');
-    status('Profile exported. Keep the downloaded file private.');
+    try {
+      stashCurrent();
+      download(profiles.normalizeCollection(collection), 'quick-apply-profiles.json');
+      status('Profiles exported. Keep the downloaded file private.');
+    } catch (error) { status(error.message, true); }
   });
   $('template').addEventListener('click', () => {
-    download(schema.exampleProfile(), 'quick-apply-template.json');
-    status('Example template downloaded.');
+    download(profiles.exampleCollection(), 'quick-apply-profiles-template.json');
+    status('Example collection template downloaded.');
   });
   $('clear').addEventListener('click', async () => {
     if (!confirm('Permanently clear your saved Quick Apply profile from this browser?')) return;
     try {
       await storage.clear();
-      render(schema.emptyProfile());
-      status('Profile cleared.');
+      collection = profiles.emptyCollection();
+      renderCollection();
+      status('Saved profiles cleared. A blank Default profile is ready to save.');
     } catch (error) {
       status(error.message, true);
     }
   });
-  storage.load().then(p => {
-    render(p);
-    status('Profile loaded.');
+  storage.loadCollection().then(saved => {
+    collection = saved;
+    renderCollection();
+    status('Profiles loaded.');
   }).catch(error => status(error.message, true));
 })();
