@@ -1,20 +1,22 @@
 # Quick Apply
 
-Quick Apply is a privacy-first Chrome and Edge extension for autofilling repetitive job applications. It stores your profile in your browser, fills the current application when you click, and never submits it for you. Greenhouse and Lever standard forms are the primary targets; Workday support covers common controls with clear limits.
+Quick Apply is a privacy-first Chrome and Edge extension for autofilling repetitive job applications. It stores named profiles in your browser, fills the current application when you click, and never submits it for you. Greenhouse and Lever standard forms are the primary targets; Workday support covers common controls with clear limits.
 
 ## Install and use
 
 1. Clone or download this repository.
 2. Open `chrome://extensions` or `edge://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`. There is no build step.
-3. Open Quick Apply and choose **Edit profile**. Add your information in the full-size options page and save it.
-4. Open an application and click **Fill Current Application** in the popup. Review the Filled, Skipped, and Need review sections before you submit the form yourself.
+3. Open Quick Apply and choose **Edit profile**. Add your information in the full-size options page and save it. Create other blank profiles or duplicate one as a linked variant.
+4. Choose the profile in the popup, then click **Fill Current Application**. Review the Filled, Skipped, and Need review sections before you submit the form yourself.
 5. On a later Workday step, advance manually and click **Fill Current Application** again. Each click scans the current DOM afresh.
 
 The options page supports personal details, links, application defaults, repeatable work and education cards, skill chips, languages, work authorization defaults and jurisdiction overrides, and tri-state declarations. Education institution, degree, and field alternatives are ordered chips. Work and education dates use separate month and year controls and save as `YYYY-MM`; older saved year-only education dates remain available until you refine them. Put the most recent entry first. The phone-country selector uses a local country and calling-code list, with a two-letter ISO code option for unlisted countries.
 
+The **Profiles** section lets you create, rename, duplicate, delete, and select profiles. A new blank profile is independent. **Duplicate as variant** creates a linked profile that inherits its base profile; only changed fields are stored as overrides. Later base edits flow into fields the variant has not changed. Deleting a base keeps its variants' effective answers. Save changes to make the editor's selected profile active in the popup. The popup selector changes the active profile immediately. Quick Apply never chooses a profile from job content.
+
 Voluntary disclosures are optional and have **Autofill voluntary disclosures** off by default. Saved disclosure answers are skipped unless you enable it. Option controls require an exact normalized match.
 
-**Import Profile JSON** accepts a schema v2 Quick Apply export, an older Quick Apply profile, or a JobPrefill profile. Imports are validated and displayed for review before you save. JobPrefill résumé content is excluded, and its voluntary disclosures remain disabled for autofill. **Export Profile JSON** downloads your current profile, including remembered answers, so treat the file as private. **Download JSON Template** downloads fixed example data that never includes your profile. **Clear profile** requires confirmation.
+**Import Profile JSON** accepts a schema v3 collection with profile names, a schema v2 or older single profile, or a JobPrefill profile. Single profiles become a named **Default** profile. Imports are validated and displayed for review before you save. JobPrefill résumé content is excluded, and its voluntary disclosures remain disabled for autofill. **Export Profile JSON** downloads the complete collection, including names, active profile, overrides, and remembered answers, so treat the file as private. **Download JSON Template** downloads two fixed example profiles that never include your data. **Clear profile** requires confirmation.
 
 ## Supported forms
 
@@ -30,15 +32,15 @@ When Workday exposes explicit repeated education or experience rows, Quick Apply
 
 ## Remembered answers
 
-In a fill result, an unknown nonsensitive question can offer **Remember answer**. You type the answer and save it deliberately. It is kept in `chrome.storage.local` with the exact normalized question, control type, platform, and site domain. Future fills use it only for that same question and scope. The option is withheld for demographic, disability, veteran, gender, ethnicity, consent, certification, and similar sensitive questions. You can remove remembered answers in **Data & privacy**.
+In a fill result, an unknown nonsensitive question can offer **Remember answer**. You type the answer and save it deliberately. It is kept in the profile used for that fill, in `chrome.storage.local`, with the exact normalized question, control type, platform, and site domain. Future fills use it only for that same question and scope. The option is withheld for demographic, disability, veteran, gender, ethnicity, consent, certification, and similar sensitive questions. You can remove remembered answers in **Data & privacy**.
 
 ## Privacy and permissions
 
-Quick Apply has no backend, telemetry, analytics, remote code, automatic submission, or extension-initiated network requests. Its profile and last result remain in `chrome.storage.local`. The manifest requests `storage`, `activeTab`, and `scripting`; it requests no permanent host permissions. `activeTab` provides temporary access when you invoke the popup, and local scripts run in the extension's isolated world. Browser-protected pages and some cross-origin embedded forms cannot be filled under this permission model.
+Quick Apply has no backend, telemetry, analytics, remote code, automatic submission, or extension-initiated network requests. Its profile collection, `activeProfileId`, and last result remain in `chrome.storage.local`. The manifest requests `storage`, `activeTab`, and `scripting`; it requests no permanent host permissions. `activeTab` provides temporary access when you invoke the popup, and local scripts run in the extension's isolated world. Browser-protected pages and some cross-origin embedded forms cannot be filled under this permission model.
 
 ## Architecture
 
-- `src/profile/` normalizes, migrates, imports, and stores schema v2 profiles. The phone-country list is bundled locally.
+- `src/profile/` normalizes individual schema v2 profiles, composes schema v3 named collections and sparse variants, migrates the previous single-profile storage key, and stores the active ID. The phone-country list is bundled locally.
 - `src/content/` scans visible controls, scores matches, fills controls, and summarizes results.
 - `src/adapters/` detects ATS platforms and handles their specific DOM behavior. Workday helpers manage bounded waits and associated dropdowns.
 - `src/utils/` contains DOM, Unicode text, and native event helpers.
@@ -66,7 +68,7 @@ Use Node 20 or newer and installed Chrome, or set `QUICK_APPLY_BROWSER_CHANNEL=m
 Manual checklist:
 
 1. Load the extension unpacked in Chrome and Edge; check the icon, popup, and options page.
-2. Import a profile, verify old education years and month-level dates, alternatives, phone country, and work authorization overrides; save, close, and reopen the editor.
+2. Import a profile, verify old education years and month-level dates, alternatives, phone country, and work authorization overrides; save, close, and reopen the editor. Duplicate it as a variant, change one field, then edit its base to confirm inheritance.
 3. Try a Greenhouse and Lever application. Confirm prefilled answers stay unchanged and unknown questions appear under Need review.
 4. Try several Workday steps. Check an exact dropdown match, a search dropdown, expected graduation month, and a control that must be skipped.
 5. Save one nonsensitive remembered answer, refill the same site, then remove it. Confirm sensitive questions have no Remember option.
