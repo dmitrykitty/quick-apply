@@ -37,6 +37,22 @@ test('selects an exact native option and skips nonmatching options', () => {
   assert.equal(fill({ element, type: 'select' }, 'France'), 'unmatched-option');
 });
 
+test('tries education alternatives in order and never selects similar options', () => {
+  const element = new MockSelect([{ text: 'Similar University', value: 'similar' }, { text: 'Second', value: 'second' }, { text: 'First', value: 'first' }]);
+  assert.equal(fill({ element, type: 'select' }, ['Canonical', 'First', 'Second']), 'filled');
+  assert.equal(element.value, 'first');
+  const noExact = new MockSelect([{ text: 'Canonical University', value: 'near' }]);
+  assert.equal(fill({ element: noExact, type: 'select' }, ['Canonical']), 'unmatched-option');
+});
+
+test('voluntary disclosure option requires exact normalized value', () => {
+  const element = new MockSelect([{ text: 'Woman', value: 'woman' }, { text: 'Woman or non-binary', value: 'other' }]);
+  assert.equal(fill({ element, type: 'select' }, 'Woman'), 'filled');
+  assert.equal(element.value, 'woman');
+  const near = new MockSelect([{ text: 'Woman or non-binary', value: 'other' }]);
+  assert.equal(fill({ element: near, type: 'select' }, 'Woman'), 'unmatched-option');
+});
+
 test('answers one radio choice without touching the other', () => {
   const yes = new MockInput('yes');
   const no = new MockInput('no');

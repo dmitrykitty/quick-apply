@@ -22,7 +22,7 @@ const contentFiles = [
       set: async values => Object.assign(window.__store, values),
       remove: async keys => { for (const key of Array.isArray(keys) ? keys : [keys]) delete window.__store[key]; }
     } } }; });
-    for (const file of ['src/profile/schema.js', 'src/profile/storage.js', 'src/options/options.js']) {
+    for (const file of ['src/profile/schema.js', 'src/profile/countries.js', 'src/profile/storage.js', 'src/options/options.js']) {
       await page.addScriptTag({ content: read(file) });
     }
     await page.locator('#personalFields [data-key="firstName"]').fill('Ada');
@@ -30,16 +30,25 @@ const contentFiles = [
     await page.locator('#personalFields [data-key="email"]').fill('ada@example.test');
     await page.locator('#personalFields [data-key="city"]').fill('Krakow');
     await page.locator('#personalFields [data-key="country"]').fill('Poland');
+    await page.locator('#personalFields [data-key="phoneCountry"]').selectOption('PL');
     await page.locator('#addEducation').click();
     await page.locator('#educationList [data-key="institution"]').fill('Example University');
     await page.locator('#educationList [data-key="degree"]').fill('BS');
-    await page.locator('#educationList [data-key="endDate"]').fill('2028-02');
+    await page.locator('#educationList [data-date-key="graduationDate"] [data-part="year"]').fill('2028');
+    await page.locator('#educationList [data-date-key="graduationDate"] [data-part="month"]').selectOption('02');
+    await page.locator('#educationList [data-tag-key="institutionAlternatives"] input').fill('Alternate University');
+    await page.locator('#educationList [data-tag-key="institutionAlternatives"] input').press('Enter');
     await page.locator('#addExperience').click();
     await page.locator('#experienceList [data-key="company"]').fill('Example Co');
     await page.locator('#experienceList [data-key="title"]').fill('Engineer');
     await page.locator('#experienceList [data-key="location"]').fill('Warsaw');
-    await page.locator('#experienceList [data-key="startDate"]').fill('2024-06');
-    await page.locator('input[name="workAuthorization.euCitizen"][value="true"]').check();
+    await page.locator('#experienceList [data-date-key="startDate"] [data-part="year"]').fill('2024');
+    await page.locator('#experienceList [data-date-key="startDate"] [data-part="month"]').selectOption('06');
+    await page.locator('#experienceList [data-date-key="endDate"] [data-part="year"]').fill('2025');
+    await page.locator('#experienceList [data-date-key="endDate"] [data-part="month"]').selectOption('01');
+    await page.locator('#experienceList [data-key="current"]').check();
+    assert.equal(await page.locator('#experienceList [data-date-key="endDate"]').isHidden(), true);
+    await page.locator('#authorizationFields [data-key="defaultAuthorizedToWork"]').selectOption('true');
     await page.locator('#addLanguage').click();
     await page.locator('#languageList [data-key="name"]').fill('English');
     await page.locator('#languageList [data-key="proficiency"]').fill('Fluent');
@@ -48,10 +57,22 @@ const contentFiles = [
     await page.locator('button[form="profileForm"]').click();
     const profile = await page.evaluate(() => window.__store.openApplyProfile);
     assert.equal(profile.personal.firstName, 'Ada');
-    assert.equal(profile.education[0].endDate, '2028-02');
+    assert.equal(profile.education[0].graduationDate, '2028-02');
+    assert.deepEqual(profile.education[0].institutionAlternatives, ['Alternate University']);
+    assert.equal(profile.personal.phoneCountryCode, '+48');
     assert.equal(profile.experience[0].startDate, '2024-06');
+    assert.equal(profile.experience[0].endDate, '');
     assert.deepEqual(profile.skills, ['JavaScript']);
     assert.equal(profile.languages[0].name, 'English');
+    await page.evaluate(() => {
+      URL.createObjectURL = blob => { window.__templateBlob = blob; return 'blob:example'; };
+      HTMLAnchorElement.prototype.click = () => {};
+    });
+    await page.locator('#template').click();
+    const template = await page.evaluate(async () => JSON.parse(await window.__templateBlob.text()));
+    assert.equal(template.schemaVersion, 2);
+    assert.equal(template.personal.firstName, 'Ada');
+    assert.notEqual(template.personal.lastName, profile.personal.lastName);
     console.log('Options editor: PASS');
 
     for (const [fixture, expectedPlatform] of [
@@ -69,7 +90,8 @@ const contentFiles = [
           const schools = document.getElementById('schools');
           school.addEventListener('click', () => { schools.hidden = false; });
           school.addEventListener('input', () => setTimeout(() => {
-            const option = document.createElement('div'); option.setAttribute('role', 'option'); option.textContent = 'Example University';
+            const option = document.createElement('div'); option.setAttribute('role', 'option');
+            option.textContent = school.value === 'Alternate University' ? 'Alternate University' : 'Similar University';
             option.addEventListener('click', () => { school.value = option.textContent; });
             schools.replaceChildren(option);
           }, 75));
@@ -82,7 +104,7 @@ const contentFiles = [
       assert.equal(await formPage.evaluate(() => window.__submitted), false);
       if (fixture === 'greenhouse.html') {
         assert.equal(await formPage.locator('#grad').inputValue(), '2028-02');
-        assert.equal(await formPage.locator('#eu-citizen').inputValue(), 'yes');
+        assert.equal(await formPage.locator('#first_name').inputValue(), 'Ada');
       }
       if (fixture === 'lever.html') {
         assert.equal(await formPage.locator('input[name="experience_company"]').inputValue(), 'Example Co');
@@ -91,6 +113,7 @@ const contentFiles = [
       if (fixture === 'workday.html') {
         assert.equal(result.details.find(item => item.label === 'Country')?.result, 'filled');
         assert.equal(result.details.find(item => item.label === 'University')?.result, 'filled');
+        assert.equal(await formPage.locator('#wd-school').inputValue(), 'Alternate University');
         assert.equal(await formPage.locator('#wd-graduation').inputValue(), '2028-02');
         assert.equal(await formPage.locator('#wd-school-2').inputValue(), '');
       }
@@ -120,7 +143,7 @@ const contentFiles = [
         } }] }
       };
     }, profile);
-    for (const file of ['src/profile/schema.js', 'src/profile/storage.js', 'src/utils/text.js', 'src/popup/popup.js']) {
+    for (const file of ['src/profile/schema.js', 'src/profile/countries.js', 'src/profile/storage.js', 'src/utils/text.js', 'src/popup/popup.js']) {
       await popup.addScriptTag({ content: read(file) });
     }
     await popup.locator('#fill').click();

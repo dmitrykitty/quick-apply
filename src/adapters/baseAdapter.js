@@ -13,7 +13,9 @@
       for (const field of fields) {
         const match = root.OpenApplyMatcher.match(field);
         const label = field.label || field.ariaLabel || field.name || field.id || 'Unlabeled field';
-        const learned = !match && root.OpenApplyMatcher.findCustomAnswer(profile, field, summary.platform, summary.domain);
+        const savedValue = match ? root.OpenApplyMatcher.valueAt(profile, match.path, field) : undefined;
+        const learned = (!match || savedValue === undefined || savedValue === null || savedValue === '') &&
+          root.OpenApplyMatcher.findCustomAnswer(profile, field, summary.platform, summary.domain);
         if (!match && !learned) {
           const sensitive = root.OpenApplyMatcher.isSensitiveQuestion(label);
           summary.unknown.push({ label, type: field.type, sensitive });
@@ -32,7 +34,9 @@
           continue;
         }
         if (/^(education|experience)\.\d+\./.test(path)) seenHistory.add(path);
-        const value = learned ? learned.answer : root.OpenApplyMatcher.valueAt(profile, path);
+        const optionControl = ['select', 'radio'].includes(field.type) || field.element.getAttribute?.('role') === 'combobox';
+        const value = learned ? learned.answer : optionControl ?
+          root.OpenApplyMatcher.candidatesAt(profile, path, field) : root.OpenApplyMatcher.valueAt(profile, path, field);
         const result = await this.fillField(field, value);
         const category = result === 'filled' ? 'filled' :
           ['already-filled', 'no-profile-value'].includes(result) ? 'skipped' : 'review';

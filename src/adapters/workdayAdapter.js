@@ -33,22 +33,24 @@
       control.click();
       const list = await helpers.waitForList(control, before);
       if (!list) return 'unsupported-workday-control';
-      const desired = typeof value === 'boolean' ? (value ? ['yes', 'true', 'tak'] : ['no', 'false', 'nie']) : [root.OpenApplyText.normalize(value)];
-      const options = Array.from(list.querySelectorAll('[role="option"], [data-automation-id="promptOption"]')).filter(root.OpenApplyDom.visible);
-      let matches = options.filter(option => desired.includes(root.OpenApplyText.normalize(root.OpenApplyDom.text(option))));
-      if (!matches.length && typeof value === 'string') {
-        const input = helpers.searchInput(control, list);
-        if (input) {
-          root.OpenApplyEvents.setNativeValue(input, value);
-          const found = await helpers.waitForVisibleOptions(control, before, 1800,
-            option => desired.includes(root.OpenApplyText.normalize(root.OpenApplyDom.text(option))));
-          matches = found?.options.filter(option => desired.includes(root.OpenApplyText.normalize(root.OpenApplyDom.text(option)))) || [];
-          if (matches.length !== 1) root.OpenApplyEvents.setNativeValue(input, '');
-        }
+      const candidates = Array.isArray(value) ? value.filter(item => typeof item === 'string' && item.trim()) : [value];
+      if (!candidates.length) return 'no-profile-value';
+      const input = helpers.searchInput(control, list);
+      for (const candidate of candidates) {
+        const desired = typeof candidate === 'boolean' ? (candidate ? ['yes', 'true', 'tak'] : ['no', 'false', 'nie']) : [root.OpenApplyText.normalize(candidate)];
+        let options = Array.from(list.querySelectorAll('[role="option"], [data-automation-id="promptOption"]')).filter(root.OpenApplyDom.visible);
+        let matches = options.filter(option => desired.includes(root.OpenApplyText.normalize(root.OpenApplyDom.text(option))));
+        if (matches.length === 1) { matches[0].click(); return 'filled'; }
+        if (matches.length > 1 || !input || typeof candidate !== 'string') continue;
+        root.OpenApplyEvents.setNativeValue(input, candidate);
+        const found = await helpers.waitForVisibleOptions(control, before, 1800,
+          option => desired.includes(root.OpenApplyText.normalize(root.OpenApplyDom.text(option))));
+        options = found?.options || [];
+        matches = options.filter(option => desired.includes(root.OpenApplyText.normalize(root.OpenApplyDom.text(option))));
+        if (matches.length === 1) { matches[0].click(); return 'filled'; }
+        root.OpenApplyEvents.setNativeValue(input, '');
       }
-      if (matches.length !== 1) return 'unmatched-option';
-      matches[0].click();
-      return 'filled';
+      return 'unmatched-option';
     }
   }
   root.OpenApplyWorkdayAdapter = WorkdayAdapter;

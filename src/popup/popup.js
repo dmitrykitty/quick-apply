@@ -27,7 +27,8 @@
       ['Personal information', !!(profile.personal.firstName && profile.personal.lastName && profile.personal.email)],
       ['Education', profile.education.some(item => item.institution || item.degree)],
       ['Experience', profile.experience.some(item => item.company || item.title)],
-      ['Work authorization', Object.values(profile.workAuthorization).some(value => value !== null)],
+      ['Work authorization', profile.workAuthorization.defaultAuthorizedToWork !== null ||
+        profile.workAuthorization.defaultRequiresSponsorship !== null || profile.workAuthorization.overrides.length > 0],
       ['Skills & languages', profile.skills.length > 0 || profile.languages.length > 0]
     ];
     $('profileStatus').replaceChildren();
@@ -125,7 +126,7 @@
     } catch (error) {
       const protectedPage = /cannot access|cannot be scripted|permission|chrome:\/\//i.test(error.message || '');
       message(protectedPage ? 'This page does not allow extension filling. Open the application itself and try again.' : error.message, 'error');
-    } finally { button.disabled = false; button.firstChild.textContent = 'Fill application '; }
+    } finally { button.disabled = false; button.firstChild.textContent = 'Fill Current Application '; }
   }
   $('fill').addEventListener('click', fill);
   $('edit').addEventListener('click', () => chrome.runtime.openOptionsPage());

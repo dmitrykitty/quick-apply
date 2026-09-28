@@ -1,106 +1,307 @@
 (function (root) {
   'use strict';
 
-  const emptyProfile = () => ({
-    personal: { firstName: '', lastName: '', preferredName: '', email: '', phone: '', city: '', country: '', address: '', postalCode: '' },
-    links: { linkedin: '', github: '', portfolio: '' },
-    education: [],
-    experience: [],
-    skills: [],
-    languages: [],
-    customAnswers: [],
-    workAuthorization: { euCitizen: null, authorizedInEU: null, requiresVisaEU: null, authorizedInUK: null, requiresVisaUK: null, authorizedInUS: null, requiresVisaUS: null, willingToRelocate: null },
-    commonAnswers: { previousEmployee: null, age18Plus: null, sponsorshipRequired: null, relocation: null }
-  });
-
-  const string = value => typeof value === 'string' ? value.trim() : '';
-  const boolean = value => typeof value === 'boolean' ? value : null;
+  const personalKeys = ['firstName', 'lastName', 'preferredName', 'email', 'phoneCountry', 'phoneCountryCode', 'phone', 'phoneType', 'addressLine1', 'addressLine2', 'city', 'stateRegion', 'postalCode', 'country', 'currentLocation', 'pronouns'];
+  const declarationKeys = ['openToFutureOpportunities', 'willingToRelocate', 'needsRelocationAssistance', 'workedHereBefore', 'relatedToEmployee', 'convictedFelony', 'terminatedForCause', 'madeRedundantLast12Months', 'governmentEmployee', 'publicSectorLink', 'consentBackgroundCheck', 'consentAutomatedReview', 'consentMarketing', 'age18Plus'];
+  const disclosureKeys = ['gender', 'ethnicity', 'veteranStatus', 'disabilityStatus', 'sexualOrientation'];
+  const string = x => typeof x === 'string' ? x.trim() : '';
+  const boolean = x => typeof x === 'boolean' ? x : null;
+  const strings = (x, n) => Array.isArray(x) ? x.filter(y => typeof y === 'string').map(string).filter(Boolean).slice(0, n) : [];
+  function phoneCountryIso(personal) {
+    const countries = root.OpenApplyCountries || [];
+    const given = string(personal.phoneCountry);
+    const country = string(personal.country);
+    return countries.find(x => x.iso.toLowerCase() === given.toLowerCase() || x.name.toLowerCase() === given.toLowerCase())?.iso || countries.find(x => x.name.toLowerCase() === country.toLowerCase() && x.callingCode === string(personal.phoneCountryCode))?.iso || given;
+  }
   const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   function date(year, month) {
     if (!year) return '';
     const raw = String(month ?? '').trim().toLowerCase();
-    const index = months.findIndex(name => name === raw || name.slice(0, 3) === raw);
-    const number = /^\d{1,2}$/.test(raw) ? Number(raw) : index + 1;
-    return number >= 1 && number <= 12 ? `${year}-${String(number).padStart(2, '0')}` : String(year);
+    const i = months.findIndex(x => x === raw || x.slice(0, 3) === raw);
+    const n = /^\d{1,2}$/.test(raw) ? Number(raw) : i + 1;
+    return n >= 1 && n <= 12 ? `${year}-${String(n).padStart(2, '0')}` : String(year);
   }
-
+  const emptyProfile = () => ({
+    schemaVersion: 2,
+    personal: Object.fromEntries(personalKeys.map(k => [k, ''])),
+    links: {
+      linkedin: '',
+      github: '',
+      portfolio: '',
+      websites: []
+    },
+    applicationDefaults: {
+      source: '',
+      preferredWorkLocation: '',
+      noticePeriod: '',
+      earliestStartDate: ''
+    },
+    experience: [],
+    education: [],
+    skills: [],
+    languages: [],
+    customAnswers: [],
+    workAuthorization: {
+      defaultAuthorizedToWork: null,
+      defaultRequiresSponsorship: null,
+      overrides: []
+    },
+    declarations: Object.fromEntries(declarationKeys.map(k => [k, null])),
+    voluntaryDisclosures: {
+      autofill: false,
+      ...Object.fromEntries(disclosureKeys.map(k => [k, '']))
+    }
+  });
   function normalizeProfile(input) {
-    const profile = emptyProfile();
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return profile;
-    const source = input.personal || {};
-    for (const key of Object.keys(profile.personal)) profile.personal[key] = string(source[key]);
-    const links = input.links || {};
-    for (const key of Object.keys(profile.links)) profile.links[key] = string(links[key]);
-    profile.education = Array.isArray(input.education) ? input.education.slice(0, 50).filter(item => item && typeof item === 'object').map(item => ({
-      institution: string(item.institution), degree: string(item.degree), fieldOfStudy: string(item.fieldOfStudy),
-      startDate: string(item.startDate) || date(item.startYear, item.startMonth),
-      endDate: string(item.endDate) || date(item.endYear, item.endMonth),
-      current: boolean(item.current) === true
+    const p = emptyProfile();
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return p;
+    const personal = input.personal || {};
+    for (const k of personalKeys) p.personal[k] = string(personal[k]);
+    p.personal.phoneCountry = phoneCountryIso(personal);
+    p.personal.addressLine1 ||= string(personal.address);
+    p.personal.stateRegion ||= string(personal.state);
+    for (const k of ['linkedin', 'github', 'portfolio']) p.links[k] = string(input.links?.[k]);
+    p.links.websites = strings(input.links?.websites, 2);
+    for (const k of Object.keys(p.applicationDefaults)) p.applicationDefaults[k] = string(input.applicationDefaults?.[k]);
+    p.education = Array.isArray(input.education) ? input.education.slice(0, 50).filter(x => x && typeof x === 'object').map(x => ({
+      institution: string(x.institution),
+      institutionAlternatives: strings(x.institutionAlternatives, 20),
+      degree: string(x.degree),
+      degreeAlternatives: strings(x.degreeAlternatives, 20),
+      fieldOfStudy: string(x.fieldOfStudy),
+      fieldOfStudyAlternatives: strings(x.fieldOfStudyAlternatives, 20),
+      startDate: string(x.startDate) || date(x.startYear, x.startMonth),
+      graduationDate: string(x.graduationDate) || string(x.endDate) || date(x.graduationYear || x.endYear, x.graduationMonth || x.endMonth),
+      gpa: string(x.gpa)
     })) : [];
-    profile.experience = Array.isArray(input.experience) ? input.experience.slice(0, 50).filter(item => item && typeof item === 'object').map(item => ({
-      company: string(item.company), title: string(item.title), location: string(item.location), startDate: string(item.startDate),
-      endDate: string(item.endDate), current: boolean(item.current) === true, description: string(item.description)
+    p.experience = Array.isArray(input.experience) ? input.experience.slice(0, 50).filter(x => x && typeof x === 'object').map(x => ({
+      title: string(x.title),
+      company: string(x.company),
+      location: string(x.location),
+      startDate: string(x.startDate) || date(x.startYear, x.startMonth),
+      endDate: string(x.endDate) || date(x.endYear, x.endMonth),
+      current: boolean(x.current) === true,
+      description: string(x.description)
     })) : [];
-    profile.skills = Array.isArray(input.skills) ? input.skills.filter(item => typeof item === 'string').map(string).filter(Boolean).slice(0, 200) : [];
-    profile.languages = Array.isArray(input.languages) ? input.languages.slice(0, 50).map(item =>
-      typeof item === 'string' ? { name: string(item), proficiency: '' } :
-        { name: string(item?.name), proficiency: string(item?.proficiency) }
-    ).filter(item => item.name) : [];
-    profile.customAnswers = Array.isArray(input.customAnswers) ? input.customAnswers.slice(0, 100).filter(item => item && typeof item === 'object').map(item => ({
-      question: string(item.question), answer: string(item.answer), controlType: string(item.controlType),
-      domain: string(item.domain), platform: string(item.platform)
-    })).filter(item => item.question && item.answer && item.domain) : [];
-    for (const group of ['workAuthorization', 'commonAnswers']) {
-      for (const key of Object.keys(profile[group])) profile[group][key] = boolean(input[group]?.[key]);
+    p.skills = strings(input.skills, 200);
+    p.languages = Array.isArray(input.languages) ? input.languages.slice(0, 50).map(x => typeof x === 'string' ? {
+      name: string(x),
+      proficiency: ''
+    } : {
+      name: string(x?.name),
+      proficiency: string(x?.proficiency)
+    }).filter(x => x.name) : [];
+    p.customAnswers = Array.isArray(input.customAnswers) ? input.customAnswers.slice(0, 100).filter(x => x && typeof x === 'object').map(x => ({
+      question: string(x.question),
+      answer: string(x.answer),
+      controlType: string(x.controlType),
+      domain: string(x.domain),
+      platform: string(x.platform)
+    })).filter(x => x.question && x.answer && x.domain) : [];
+    const a = input.workAuthorization || {};
+    p.workAuthorization.defaultAuthorizedToWork = boolean(a.defaultAuthorizedToWork);
+    p.workAuthorization.defaultRequiresSponsorship = boolean(a.defaultRequiresSponsorship);
+    p.workAuthorization.overrides = Array.isArray(a.overrides) ? a.overrides.slice(0, 50).map(x => ({
+      jurisdiction: string(x?.jurisdiction),
+      authorizedToWork: boolean(x?.authorizedToWork),
+      requiresSponsorship: boolean(x?.requiresSponsorship)
+    })).filter(x => x.jurisdiction) : [];
+    if (!input.schemaVersion || input.schemaVersion < 2) {
+      p.workAuthorization.defaultRequiresSponsorship ??= boolean(input.commonAnswers?.sponsorshipRequired);
+      const legacyAuthorized = ['authorizedInEU', 'authorizedInUK', 'authorizedInUS'].map(k => boolean(a[k])).filter(x => x !== null);
+      if (p.workAuthorization.defaultAuthorizedToWork === null && legacyAuthorized.length && legacyAuthorized.every(x => x === legacyAuthorized[0])) p.workAuthorization.defaultAuthorizedToWork = legacyAuthorized[0];
+      for (const [jurisdiction, authorizedKey, visaKey] of [['EU', 'authorizedInEU', 'requiresVisaEU'], ['UK', 'authorizedInUK', 'requiresVisaUK'], ['US', 'authorizedInUS', 'requiresVisaUS']]) {
+        const authorizedToWork = boolean(a[authorizedKey]),
+          requiresSponsorship = boolean(a[visaKey]);
+        if ((authorizedToWork !== null || requiresSponsorship !== null) && !p.workAuthorization.overrides.some(x => x.jurisdiction === jurisdiction)) p.workAuthorization.overrides.push({
+          jurisdiction,
+          authorizedToWork,
+          requiresSponsorship
+        });
+      }
     }
-    return profile;
+    for (const k of declarationKeys) p.declarations[k] = boolean(input.declarations?.[k]);
+    if (!input.schemaVersion || input.schemaVersion < 2) {
+      p.declarations.workedHereBefore ??= boolean(input.commonAnswers?.previousEmployee);
+      p.declarations.age18Plus ??= boolean(input.commonAnswers?.age18Plus);
+      p.declarations.willingToRelocate ??= boolean(a.willingToRelocate) ?? boolean(input.commonAnswers?.relocation);
+    }
+    p.voluntaryDisclosures.autofill = input.voluntaryDisclosures?.autofill === true;
+    for (const k of disclosureKeys) p.voluntaryDisclosures[k] = string(input.voluntaryDisclosures?.[k]);
+    return p;
   }
-
-  function parseLanguageLines(text) {
-    return String(text ?? '').split(/\r?\n/).map(line => {
-      const [name, ...proficiency] = line.split('|');
-      return { name: string(name), proficiency: string(proficiency.join('|')) };
-    }).filter(item => item.name);
-  }
-
-  function formatLanguageLines(languages) {
-    return (languages || []).map(item => `${item.name}${item.proficiency ? ` | ${item.proficiency}` : ''}`).join('\n');
-  }
-
-  // Convert the user's JobPrefill export at import time; never bundle profile data.
   function fromJobPrefill(input) {
-    if (!input || typeof input !== 'object' || !input.personal || !Array.isArray(input.workExperience)) {
-      throw new Error('Not a supported JobPrefill export.');
-    }
-    const p = input.personal;
-    const d = input.declarations || {};
+    if (!input || typeof input !== 'object' || !input.personal || !Array.isArray(input.workExperience)) throw new Error('Not a supported JobPrefill export.');
+    const x = input.personal,
+      d = input.declarations || {};
     return normalizeProfile({
+      schemaVersion: 2,
       personal: {
-        firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone,
-        city: p.city, country: p.country, address: p.addressLine1, postalCode: p.postalCode
+        ...x,
+        stateRegion: x.state,
+        phoneCountry: x.phoneCountry || ''
       },
-      links: { linkedin: p.linkedinUrl, portfolio: p.websiteUrl },
-      education: (input.education || []).map(item => ({
-        institution: item.institution, degree: item.degree, fieldOfStudy: item.fieldOfStudy,
-        startDate: date(item.startYear, item.startMonth), endDate: date(item.graduationYear, item.graduationMonth),
-        current: item.currentlyStudying
+      links: {
+        linkedin: x.linkedinUrl,
+        portfolio: x.websiteUrl,
+        websites: x.websites
+      },
+      applicationDefaults: {
+        source: x.howDidYouHearAboutUs,
+        noticePeriod: x.noticePeriod
+      },
+      experience: input.workExperience.map(y => ({
+        title: y.jobTitle,
+        company: y.company,
+        location: y.location,
+        startDate: date(y.startYear, y.startMonth),
+        endDate: date(y.endYear, y.endMonth),
+        current: y.currentRole,
+        description: y.description
       })),
-      experience: input.workExperience.map(item => ({
-        company: item.company, title: item.jobTitle, location: item.location,
-        startDate: date(item.startYear, item.startMonth), endDate: date(item.endYear, item.endMonth),
-        current: item.currentRole, description: item.description
+      education: (input.education || []).map(y => ({
+        institution: y.institution,
+        institutionAlternatives: y.institutionAlternatives,
+        degree: y.degree,
+        degreeAlternatives: y.degreeAlternatives,
+        fieldOfStudy: y.fieldOfStudy,
+        fieldOfStudyAlternatives: y.fieldOfStudyAlternatives,
+        startDate: date(y.startYear, y.startMonth),
+        graduationDate: date(y.graduationYear, y.graduationMonth),
+        gpa: y.gpa
       })),
       skills: input.skills,
       languages: input.languages,
-      workAuthorization: { willingToRelocate: d.willingToRelocate },
-      commonAnswers: {
-        previousEmployee: d.workedHereBefore, age18Plus: d.atLeast18,
-        sponsorshipRequired: d.requireSponsorship, relocation: d.willingToRelocate
+      workAuthorization: {
+        defaultAuthorizedToWork: d.authorizedToWork,
+        defaultRequiresSponsorship: d.requireSponsorship
+      },
+      declarations: {
+        openToFutureOpportunities: d.openToFutureRoles,
+        willingToRelocate: d.willingToRelocate,
+        needsRelocationAssistance: d.relocationAssistance,
+        workedHereBefore: d.workedHereBefore,
+        relatedToEmployee: d.relatedToEmployee,
+        convictedFelony: d.convictedOfFelony,
+        terminatedForCause: d.terminatedForCause,
+        madeRedundantLast12Months: d.madeRedundantRecently,
+        governmentEmployee: d.governmentEmployee,
+        publicSectorLink: d.publicSectorLink,
+        consentBackgroundCheck: d.backgroundCheckConsent,
+        consentAutomatedReview: d.aiScreeningConsent,
+        consentMarketing: d.marketingContactConsent,
+        age18Plus: d.atLeast18
+      },
+      voluntaryDisclosures: input.voluntaryDisclosures
+    });
+  }
+  function importProfile(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Expected a JSON profile object.');
+    if (Array.isArray(input.workExperience)) return fromJobPrefill(input);
+    if (input.schemaVersion !== undefined && input.schemaVersion !== 1 && input.schemaVersion !== 2) throw new Error(`Unsupported schemaVersion: ${input.schemaVersion}.`);
+    if (!input.personal || typeof input.personal !== 'object' || Array.isArray(input.personal)) throw new Error('Missing or invalid personal object.');
+    for (const k of ['education', 'experience', 'skills', 'languages']) if (input[k] !== undefined && !Array.isArray(input[k])) throw new Error(`${k} must be an array.`);
+    for (const k of ['links', 'workAuthorization', 'declarations', 'voluntaryDisclosures']) if (input[k] !== undefined && (!input[k] || typeof input[k] !== 'object' || Array.isArray(input[k]))) throw new Error(`${k} must be an object.`);
+    if (input.workAuthorization?.overrides !== undefined && !Array.isArray(input.workAuthorization.overrides)) throw new Error('workAuthorization.overrides must be an array.');
+    for (const [group, keys] of [['personal', personalKeys], ['links', ['linkedin', 'github', 'portfolio']], ['applicationDefaults', ['source', 'preferredWorkLocation', 'noticePeriod', 'earliestStartDate']], ['voluntaryDisclosures', disclosureKeys]]) for (const key of keys) {
+      const value = input[group]?.[key];
+      if (value !== undefined && typeof value !== 'string') throw new Error(`${group}.${key} must be text.`);
+    }
+    if (input.links?.websites !== undefined && !Array.isArray(input.links.websites)) throw new Error('links.websites must be an array.');
+    for (const key of ['education', 'experience']) for (const [i, item] of (input[key] || []).entries()) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`${key}[${i}] must be an object.`);
+      if (key === 'education') for (const alt of ['institutionAlternatives', 'degreeAlternatives', 'fieldOfStudyAlternatives']) if (item[alt] !== undefined && !Array.isArray(item[alt])) throw new Error(`education[${i}].${alt} must be an array.`);
+    }
+    return normalizeProfile(input);
+  }
+  function exampleProfile() {
+    return normalizeProfile({
+      schemaVersion: 2,
+      personal: {
+        firstName: 'Ada',
+        lastName: 'Example',
+        email: 'ada@example.test',
+        phoneCountry: 'PL',
+        phoneCountryCode: '+48',
+        phone: '123456789',
+        city: 'Warsaw',
+        country: 'Poland'
+      },
+      links: {
+        linkedin: 'https://example.test/ada',
+        websites: ['https://portfolio.example.test']
+      },
+      applicationDefaults: {
+        source: 'Company careers page',
+        preferredWorkLocation: 'Remote',
+        noticePeriod: '2 weeks',
+        earliestStartDate: '2026-10-01'
+      },
+      experience: [{
+        title: 'Engineer',
+        company: 'Example Co',
+        location: 'Warsaw',
+        startDate: '2022-01',
+        current: true,
+        description: 'Built software.'
+      }],
+      education: [{
+        institution: 'Example University',
+        institutionAlternatives: ['Example U'],
+        degree: 'Bachelor of Science',
+        degreeAlternatives: ['BS'],
+        fieldOfStudy: 'Computer Science',
+        fieldOfStudyAlternatives: ['CS'],
+        startDate: '2018-09',
+        graduationDate: '2022-06'
+      }],
+      skills: ['JavaScript'],
+      languages: [{
+        name: 'English',
+        proficiency: 'Fluent'
+      }],
+      workAuthorization: {
+        defaultAuthorizedToWork: true,
+        defaultRequiresSponsorship: false,
+        overrides: [{
+          jurisdiction: 'US',
+          authorizedToWork: false,
+          requiresSponsorship: true
+        }]
+      },
+      declarations: {
+        age18Plus: true
+      },
+      voluntaryDisclosures: {
+        autofill: false,
+        gender: 'Woman'
       }
     });
   }
-
-  const api = { emptyProfile, normalizeProfile, fromJobPrefill, parseLanguageLines, formatLanguageLines };
+  function parseLanguageLines(text) {
+    return String(text ?? '').split(/\r?\n/).map(line => {
+      const [name, ...proficiency] = line.split('|');
+      return {
+        name: string(name),
+        proficiency: string(proficiency.join('|'))
+      };
+    }).filter(x => x.name);
+  }
+  function formatLanguageLines(languages) {
+    return (languages || []).map(x => `${x.name}${x.proficiency ? ` | ${x.proficiency}` : ''}`).join('\n');
+  }
+  const api = {
+    emptyProfile,
+    normalizeProfile,
+    fromJobPrefill,
+    importProfile,
+    exampleProfile,
+    parseLanguageLines,
+    formatLanguageLines,
+    personalKeys,
+    declarationKeys,
+    disclosureKeys
+  };
   root.OpenApplySchema = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);

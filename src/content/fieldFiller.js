@@ -11,10 +11,14 @@
   function fill(field, value) {
     const element = field.element;
     if (value === null || value === undefined || value === '') return 'no-profile-value';
+    const candidates = Array.isArray(value) ? value.filter(item => typeof item === 'string' && item.trim()) : null;
+    if (candidates && !candidates.length) return 'no-profile-value';
     if (field.type === 'radio') {
-      const choices = typeof value === 'boolean' ? yesNo(value) : [normalize(value)];
-      const matching = field.options.filter(option => choices.includes(normalize(option.text)) || choices.includes(normalize(option.element.value)));
-      if (matching.length !== 1) return 'unmatched-option';
+      const ordered = candidates || (typeof value === 'boolean' ? [yesNo(value)] : [[normalize(value)]]);
+      const matching = ordered.map(candidate => field.options.filter(option =>
+        (Array.isArray(candidate) ? candidate : [normalize(candidate)]).some(choice => choice === normalize(option.text) || choice === normalize(option.element.value))
+      )).find(items => items.length === 1);
+      if (!matching) return 'unmatched-option';
       if (matching[0].element.checked) return 'already-filled';
       events.setChecked(matching[0].element, true);
       return 'filled';
@@ -27,13 +31,16 @@
       return 'filled';
     }
     if (field.type === 'select') {
-      const choices = typeof value === 'boolean' ? yesNo(value) : [normalize(value)];
-      const matching = Array.from(element.options).filter(option => choices.includes(normalize(option.text)) || choices.includes(normalize(option.value)));
-      if (matching.length !== 1) return 'unmatched-option';
+      const ordered = candidates || (typeof value === 'boolean' ? [yesNo(value)] : [[normalize(value)]]);
+      const matching = ordered.map(candidate => Array.from(element.options).filter(option =>
+        (Array.isArray(candidate) ? candidate : [normalize(candidate)]).some(choice => choice === normalize(option.text) || choice === normalize(option.value))
+      )).find(items => items.length === 1);
+      if (!matching) return 'unmatched-option';
       if (element.value === matching[0].value) return 'already-filled';
       return events.setNativeValue(element, matching[0].value) ? 'filled' : 'unsupported-control';
     }
     if (typeof value === 'boolean') return 'unsupported-control';
+    if (candidates) value = candidates[0];
     if (element.value?.trim()) return 'already-filled';
     if (field.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return 'unsupported-format';
     if (field.type === 'month' && !/^\d{4}-\d{2}$/.test(String(value))) return 'unsupported-format';
