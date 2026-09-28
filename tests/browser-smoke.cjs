@@ -5,7 +5,7 @@ const { chromium } = require(process.argv[2] || process.env.QUICK_APPLY_PLAYWRIG
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const contentFiles = [
-  'src/utils/text.js', 'src/utils/dom.js', 'src/utils/events.js',
+  'src/utils/text.js', 'src/utils/dom.js', 'src/utils/events.js', 'src/profile/countries.js',
   'src/content/formScanner.js', 'src/content/fieldMatcher.js', 'src/content/fieldFiller.js',
   'src/adapters/baseAdapter.js', 'src/adapters/greenhouseAdapter.js', 'src/adapters/leverAdapter.js',
   'src/adapters/workdayHelpers.js', 'src/adapters/workdayAdapter.js', 'src/content/index.js'

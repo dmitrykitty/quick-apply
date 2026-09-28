@@ -11,7 +11,11 @@
     const countries = root.OpenApplyCountries || [];
     const given = string(personal.phoneCountry);
     const country = string(personal.country);
-    return countries.find(x => x.iso.toLowerCase() === given.toLowerCase() || x.name.toLowerCase() === given.toLowerCase())?.iso || countries.find(x => x.name.toLowerCase() === country.toLowerCase() && x.callingCode === string(personal.phoneCountryCode))?.iso || given;
+    const callingCode = string(personal.phoneCountryCode);
+    const byCode = countries.filter(x => x.callingCode === callingCode);
+    return countries.find(x => x.iso.toLowerCase() === given.toLowerCase() || x.name.toLowerCase() === given.toLowerCase())?.iso ||
+      countries.find(x => x.name.toLowerCase() === country.toLowerCase() && x.callingCode === callingCode)?.iso ||
+      (byCode.length === 1 ? byCode[0].iso : given);
   }
   const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   function date(year, month) {

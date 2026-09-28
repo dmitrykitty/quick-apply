@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   normalize
 } = require('../src/utils/text');
+require('../src/profile/countries');
 const {
   match,
   valueAt,
@@ -99,6 +100,11 @@ test('education option candidates keep canonical then saved alternative order', 
   });
   assert.deepEqual(candidatesAt(p, 'education.0.institution'), ['Canonical', 'Second', 'First']);
   assert.equal(valueAt(p, 'education.0.institution'), 'Canonical');
+});
+test('phone country candidates use exact local names and calling codes', () => {
+  const profile = normalizeProfile({ schemaVersion: 2, personal: { phoneCountry: 'PL', phoneCountryCode: '+48' } });
+  assert.deepEqual(candidatesAt(profile, 'personal.phoneCountry'), ['PL', 'Poland', 'Poland (+48)']);
+  assert.deepEqual(candidatesAt(profile, 'personal.phoneCountryCode'), ['+48', '48']);
 });
 test('voluntary disclosures require opt-in and exact labels', () => {
   const p = normalizeProfile({

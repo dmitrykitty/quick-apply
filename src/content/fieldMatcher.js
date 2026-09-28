@@ -162,6 +162,11 @@
   function candidatesAt(profile, path, field) {
     const value = valueAt(profile, path, field);
     if (value === undefined || value === null || value === '') return value;
+    if (path === 'personal.phoneCountry') {
+      const country = root.OpenApplyCountries?.find(item => item.iso === value);
+      return country ? [value, country.name, `${country.name} (${country.callingCode})`] : value;
+    }
+    if (path === 'personal.phoneCountryCode' && /^\+\d+$/.test(value)) return [value, value.slice(1)];
     const match = path.match(/^education\.(\d+)\.(institution|degree|fieldOfStudy)$/);
     if (!match) return value;
     const alternatives = profile.education?.[Number(match[1])]?.[`${match[2]}Alternatives`] || [];
